@@ -1,0 +1,15 @@
+# dsh-voice bundle patch.
+#
+# One row, mounted at the end of the web profile roster. The host half registers
+# a /api/voice prefix route; the browser half adds a speaker to each assistant
+# message and a microphone to the composer.
+#
+# KILL SWITCH: to turn this off without uninstalling anything, add to
+# the web profile's cordis.patch.yml (~/.dsh/profiles/web/cordis.patch.yml)
+#     - id: voice
+#       disabled: true
+# and restart dsh-web. That is the same mechanism used on 2026-09-08 to stop
+# three third-party plugins from crash-looping the whole UI.
+- insert:
+    - id: voice
+      name: 'dsh-voice'

@@ -1,0 +1,9 @@
+# dsh-tts-reader (retired stub): one host row so profiles that still list the
+# package keep resolving. It registers nothing; the TTS Reader tab now comes
+# from dsh-voice 2. Kill switch, as before: add to the web profile's
+# cordis.patch.yml
+#     - id: dsh-tts-reader
+#       disabled: true
+- insert:
+    - id: dsh-tts-reader
+      name: 'dsh-tts-reader'
