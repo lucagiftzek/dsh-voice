@@ -12,4 +12,4 @@
 # three third-party plugins from crash-looping the whole UI.
 - insert:
     - id: voice
-      name: 'dsh-voice'
+      name: '@lucagiftzek/dsh-voice'

@@ -16,7 +16,7 @@ description: Diagnose and fix dsh-voice problems step by step (no audio, microph
 - Stop and report after a fix; verify with the step given.
 
 ## 0. Facts (read-only)
-1. Plugin dir: `node -p "require('path').dirname(require.resolve('dsh-voice/package.json', {paths:[(process.env.DSH_HOME||require('os').homedir()+'/.dsh')+'/profiles/web']}))"`
+1. Plugin dir: `node -p "require('path').dirname(require.resolve('@lucagiftzek/dsh-voice/package.json', {paths:[(process.env.DSH_HOME||require('os').homedir()+'/.dsh')+'/profiles/web']}))"`
    Docs are in `docs/TROUBLESHOOTING.md` and `docs/ERRORS.md` inside it
    (fallback: the GitHub repository of the plugin).
 2. Doctor: `curl -s <dsh-url>/api/voice/doctor` (`<dsh-url>` is for example `http://127.0.0.1:3080`).

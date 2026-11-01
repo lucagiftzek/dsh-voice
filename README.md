@@ -1,10 +1,13 @@
 # dsh-voice
 
+[![npm](https://img.shields.io/npm/v/%40lucagiftzek%2Fdsh-voice?label=npm)](https://www.npmjs.com/package/@lucagiftzek/dsh-voice)
+
 Read-aloud and dictation for DSH with 23 TTS and STT providers, per-language routing and word highlighting.
 
 ```bash
 dsh plugin --profile web add dsh-better-sidebar   # the tab host, skip if installed
-dsh plugin --profile web add github:lucagiftzek/dsh-voice
+dsh plugin --profile web add @lucagiftzek/dsh-voice
+# or from GitHub: dsh plugin --profile web add github:lucagiftzek/dsh-voice
 # restart dsh web, then pick your speech providers in Settings, Voice
 ```
 
@@ -29,8 +32,11 @@ Status: 2.0.0. 23 provider types, EU vendors first; see [CHANGELOG.md](CHANGELOG
 
 ## Install
 
+Install from npm: `dsh plugin --profile web add @lucagiftzek/dsh-voice`, or from GitHub: `dsh plugin --profile web add github:lucagiftzek/dsh-voice`.
+
 ```sh
-dsh plugin --profile web add github:lucagiftzek/dsh-voice
+dsh plugin --profile web add @lucagiftzek/dsh-voice
+# or from GitHub: dsh plugin --profile web add github:lucagiftzek/dsh-voice
 ```
 
 The package declares `dsh.bundle`, so `dsh plugin add` lists it in the profile bundles; restart `dsh web` to load the host half. `lib/` is committed, so no build step is needed. From a checkout instead: `git clone https://github.com/lucagiftzek/dsh-voice`, then `dsh plugin --profile web add link:$PWD/dsh-voice`. Then open Settings > Voice, add a provider and press Test.

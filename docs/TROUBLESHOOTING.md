@@ -431,7 +431,7 @@ dsh --profile web --dump-config 2>/dev/null | grep -n -i 'voice' | head    # com
 journalctl -u <your-dsh-unit> --since "1 hour ago" | grep -i -E 'dsh-voice|voice|incompatible|skipped|exemption' | tail -40
 ```
 
-**Fix:** install with `dsh plugin --profile web add dsh-voice` (it adds the package to
+**Fix:** install with `dsh plugin --profile web add @lucagiftzek/dsh-voice` (it adds the package to
 `dsh.profile.bundles` when the package declares `dsh.bundle`), then restart
 `dsh web` **[HUMAN if your chat runs inside dsh web]**. If the log says the bundle
 was skipped as incompatible, update the plugin; DSH 0.2.x also offers an exact-version
@@ -529,7 +529,7 @@ GB on a large profile; with swap full, the kernel or earlyoom kills unrelated se
 
 **Fix:** check `free -m` first, then install inside a memory-capped scope:
 ```bash
-systemd-run --user --scope -p MemoryMax=3G dsh plugin --profile web add dsh-voice
+systemd-run --user --scope -p MemoryMax=3G dsh plugin --profile web add @lucagiftzek/dsh-voice
 # pnpm only: add --child-concurrency 1 to reduce peak memory
 ```
 A runaway then kills only itself. Check afterwards that your other services are up.

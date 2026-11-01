@@ -20,14 +20,14 @@ test('fresh build verifies and matches the committed lib/client.js', async () =>
 test('bundle requires only react, exports name/inject/apply like 1.x', async () => {
   const src = readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8')
   const { id, exported, required } = loadClientBundle(src)
-  assert.equal(id, 'dsh-voice')
+  assert.equal(id, '@lucagiftzek/dsh-voice')
   assert.equal(exported.name, 'dsh-voice')
   assert.equal(JSON.stringify(exported.inject), '["slots"]')
   assert.equal(JSON.stringify(Array.from(new Set(required))), '["react"]')
 })
 
 test('verifier rejects a bundle without apply', () => {
-  assert.throws(() => verifyClientBundle("window.__ModuleLoader__.load({ id: 'dsh-voice', factory: function () { return {} } })"), /no apply/)
+  assert.throws(() => verifyClientBundle("window.__ModuleLoader__.load({ id: '@lucagiftzek/dsh-voice', factory: function () { return {} } })"), /no apply/)
   assert.throws(() => verifyClientBundle("window.__ModuleLoader__.load({ id: 'other', factory: function () { return { apply() {} } } })"), /expected/)
 })
 

@@ -1,8 +1,7 @@
 {
-  "name": "dsh-voice",
+  "name": "@lucagiftzek/dsh-voice",
   "version": "2.0.0",
   "description": "Read-aloud, dictation and language-aware speech for the DeepSeek Harness web UI: many TTS/STT providers at once (EU vendors first: Mistral, Speechmatics, Gladia, ReadSpeaker; plus ElevenLabs, Azure, Google, Amazon, OpenAI and OpenAI-compatible servers, Deepgram, Cartesia, AssemblyAI, Fish, self-hosted Piper/XTTS/Kokoro, the browser voice), per-language routing, in-text language markers and word highlighting.",
-  "private": true,
   "license": "MIT",
   "type": "module",
   "main": "lib/index.js",
@@ -76,5 +75,8 @@
     "speech-to-text",
     "text-to-speech",
     "tts"
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }
