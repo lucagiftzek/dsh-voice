@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.1 (2026-11-25)
+
+### Fixed
+- **The browser voice no longer drops the natural voices on Windows.** `localVoice()` only accepted voices with `localService === true`, but the natural neural voices of Edge and Windows (Xiaoxiao, Yunxi, Aria and so on) are cloud voices, so only the mechanical offline set (Huihui, Kangkang) could ever be chosen (issue #1, thanks @AYYYRA). Now a cloud voice whose name says Natural or Neural is a candidate and is preferred within the language (exact tag, then primary subtag); the on-device voice stays the fallback. Ordinary online voices such as Chrome's "Google ..." ones are still never picked, because they send the text to Google.
+- **`perLanguage.<lang>.tts.voice` is honoured by the browser voice.** A voice name (exact, or a part of the name, case-insensitive) picks that voice when the device has it, even a cloud one; an unknown name is ignored.
+
 ## 2.0.0 (2026-11-02)
 
 First public release (squashed history).

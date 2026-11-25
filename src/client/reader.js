@@ -110,7 +110,7 @@ export function jobsFor(item, segs, mode) {
   const jobs = planJobs(segs, (seg) => {
     const segEngine = seg.provider || picked
     const resolved = segEngine === 'auto' ? autoFor(cfg, seg.lang) : segEngine
-    if (resolved === 'browser') return { engine: 'browser' }
+    if (resolved === 'browser') return { engine: 'browser', voice: browserVoiceName(cfg, seg.lang) }
     const own = segEngine === engine
     return {
       engine: segEngine,
@@ -137,8 +137,17 @@ function showPos(hl, mode, pos) {
   hl.show(pos.sentence, mode === 'word' ? pos.word : null)
 }
 
-function browserHooks(a, mode) {
+/** The voice name set for a language in Settings > Voice (perLanguage.<lang>.tts.voice, then '*'); '' when none. */
+export function browserVoiceName(cfg, lang) {
+  const per = (cfg && cfg.perLanguage) || {}
+  const l = String(lang || '').toLowerCase().slice(0, 2)
+  const e = (per[l] && per[l].tts) || (per['*'] && per['*'].tts) || null
+  return e && typeof e.voice === 'string' ? e.voice.trim() : ''
+}
+
+function browserHooks(a, mode, cfg) {
   return {
+    voiceFor: (seg) => browserVoiceName(cfg, seg.lang),
     forSegment: (seg) => ({
       onBoundary: (ci) => {
         if (!a.hl) return
@@ -167,7 +176,7 @@ async function start(item) {
   const engine = item.engine || 'auto'
   if (engine === 'browser') {
     setNow({ state: 'speaking', lang: segs[0].lang, langSource: segs[0].source })
-    if (!speakBrowserSegments(segs, () => finish(a), browserHooks(a, mode))) finish(a)
+    if (!speakBrowserSegments(segs, () => finish(a), browserHooks(a, mode, item.cfg))) finish(a)
     return
   }
   const jobs = jobsFor(item, segs, mode)
@@ -201,7 +210,7 @@ async function start(item) {
     // A vendor outage must not mean silence, but it must not SOUND like the
     // chosen engine either: the browser voice takes over only when allowed,
     // and the row says which voice is speaking and why.
-    if (readPref(FALLBACK_KEY, '1') !== '0' && speakBrowserSegments(segs, () => finish(a), browserHooks(a, mode))) {
+    if (readPref(FALLBACK_KEY, '1') !== '0' && speakBrowserSegments(segs, () => finish(a), browserHooks(a, mode, item.cfg))) {
       setNow({ state: 'fallback', why: reason })
       if (/quota|credit/i.test(reason)) refreshConfig()
       return
