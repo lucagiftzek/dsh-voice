@@ -21,6 +21,7 @@ import { VoiceSettings } from './settings.jsx'
 import { readerTabDescriptor } from './reader-tab.jsx'
 import { migratePrefs } from '../../lib/shared/prefs.js'
 import { installShortcuts } from './shortcuts.js'
+import { registerClipSlot } from './clip-panel.jsx'
 import { stop, togglePause, skipSentence, lastMessage, getNow } from './reader.js'
 import { autoRead } from './autoread.js'
 import { getMic } from './mic-registry.js'
@@ -64,6 +65,8 @@ export function apply(ctx) {
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section', id: 'voice-settings', order: 60, label: () => 'Voice', inject: () => ({}),
   }, VoiceSettings))
+  // the clips the speech tools produced, played at the end of the turn beside the file cards
+  registerClipSlot(ctx, { order: 40 })
   ctx.slots.inject('conversation.input.right', () => ctx.slots.register(
     { name: 'conversation.input.right', id: 'voice-mic', order: 100, label: 'Dictate' },
     MicAction,

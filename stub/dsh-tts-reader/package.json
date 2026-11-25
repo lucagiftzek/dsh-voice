@@ -18,5 +18,5 @@
     "bundle": { "patch": "./cordis.patch.yml" },
     "client": { "platform": "web", "inject": [] }
   },
-  "author": { "name": "Luca Tzekos", "url": "https://jobopportunitiesapi.org" }
+  "author": { "name": "Loukas \"Luca\" Tzekos", "url": "https://jobopportunitiesapi.org" }
 }

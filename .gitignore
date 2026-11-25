@@ -1,1 +1,11 @@
 node_modules/
+
+# Editor and OS noise
+*~
+.DS_Store
+
+# Local backups and build leftovers (never part of a release)
+*.bak-*
+*.orig
+*.rej
+.tmp/

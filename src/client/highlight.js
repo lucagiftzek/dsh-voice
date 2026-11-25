@@ -27,7 +27,7 @@ function ensureStyle() {
   if (typeof document === 'undefined' || document.getElementById(STYLE_ID)) return
   const st = document.createElement('style')
   st.id = STYLE_ID
-  // The host accent (a theme accent when set, the brand blue on stock DSH); amber when no token resolves.
+  // The host accent (a warm wash on the Tzekos theme, the brand blue on stock DSH); amber when no token resolves.
   st.textContent = '::highlight(' + HL_SENTENCE + '){background-color:color-mix(in srgb,var(--dsw-alias-brand-primary,#ffc400) 24%,transparent)}'
     + '::highlight(' + HL_WORD + '){background-color:color-mix(in srgb,var(--dsw-alias-brand-primary,#ffa000) 55%,transparent);text-decoration:underline;text-decoration-thickness:2px}'
   document.head.appendChild(st)
@@ -126,13 +126,20 @@ export function createHighlighter({ container }) {
 
   return {
     supported,
-    /** A new chunk starts: locate it in the rendered text. */
-    startChunk(text) {
+    /**
+     * A new chunk starts: locate `look` (what the screen shows) in the rendered text, from `startAt`
+     * (its offset in the message when the caller has a map). The positions the caller reports are
+     * offsets in `look`, so the chunk keeps them as they are.
+     */
+    startChunk(text, opts) {
       if (!supported) return false
       if (!container.isConnected) return false
-      let hit = findKey(index, text, cursor)
-      if (!hit) { reindex(); hit = findKey(index, text, 0) }
-      chunk = hit ? { text, k0: hit.k0, k1: hit.k1 } : null
+      const o = opts || {}
+      const look = o.look || text
+      let hit = findKey(index, look, Number.isFinite(o.startAt) ? o.startAt : cursor)
+      if (!hit) { reindex(); hit = findKey(index, look, 0) }
+      if (!hit) hit = findKey(index, look, cursor)
+      chunk = hit ? { text: look, k0: hit.k0, k1: hit.k1, spoken: text } : null
       if (hit) cursor = hit.k1
       lastSentenceKey = ''
       return Boolean(hit)

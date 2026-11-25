@@ -18,8 +18,10 @@ import { currentAudio } from './player.js'
 import { autoRead } from './autoread.js'
 import { saveBytes } from './export.js'
 import { readerModelToRoute } from '../../lib/shared/prefs.js'
-import { TAGS, takesTags, stripTags, insertMarker, insertSnippet, fileText } from './tags.js'
+import { tagsFor, takesTags, stripTags, insertMarker, insertSnippet, fileText, SYNTAX } from './tags.js'
 import { Icon, ensureStyles } from './ui.jsx'
+import { facetOptions, groupVoices, filterVoices, HIDDEN_PROVIDERS, presetsFor, togglePreset, isPresetOf, presetLabel, presetKey } from './voices.js'
+import { VoiceFields, VoiceNote } from './voice-fields.js'
 
 export const TAB_ID = 'dsh-tts-reader:main'
 export const TAB_TITLE = 'TTS Reader'
@@ -29,6 +31,8 @@ const PROVIDER_KEY = 'dsh-voice.v2.reader.provider'
 const MODEL_PICK_KEY = 'dsh-voice.v2.reader.model'
 const VOICE_KEY_PREFIX = 'dsh-tts-reader.voice.'
 const OLD_MODEL_KEY = 'dsh-tts-reader.model'
+const PRESETS_KEY = 'dsh-voice.v2.presets'
+const FACET_KEY = 'dsh-voice.v2.reader.facets.'
 const MARKERS = [['en', 'EN'], ['it', 'IT'], ['el', 'EL'], ['/', 'end']]
 // The source segments: Paste focuses the text box (and pastes the clipboard when the browser allows it).
 const SOURCES = [['paste', 'Paste', 'Paste text from the clipboard'], ['reply', 'Current reply', 'Take the current reply'], ['selection', 'Selection', 'Take the text selected in the chat'], ['file', 'File', 'Open file: a .txt, .md or .html file from this computer']]
@@ -53,26 +57,69 @@ function hookSelection(rootRef) {
 }
 
 /** Providers the tab offers: auto, every enabled TTS instance, the browser voice. */
-export function readerProviders(cfg) {
-  const out = [{ id: 'auto', label: 'Auto (per language)' }]
+/**
+ * Providers the tab offers: the starred presets first (each restores a whole voice), then Auto, then every
+ * enabled speech provider except the ones the person removed (Tzekos and Liquid, by id), then the browser.
+ */
+export function readerProviders(cfg, presets) {
+  const out = []
+  const list = Array.isArray(presets) ? presets.filter((p) => p && HIDDEN_PROVIDERS.indexOf(p.provider) < 0) : []
+  for (const p of list) out.push({ id: 'preset:' + p.id, label: 'Preset: ' + p.providerLabel + ', ' + presetLabel(p), preset: p })
+  out.push({ id: 'auto', label: 'Auto (per language)' })
   for (const p of (cfg && cfg.providers) || []) {
     if (!p.enabled || p.type === 'browser' || !p.tts) continue
+    if (HIDDEN_PROVIDERS.indexOf(p.id) >= 0) continue
     out.push({ id: p.id, label: p.label || p.id })
   }
   out.push({ id: 'browser', label: 'Browser voice (no export)' })
   return out
 }
 
-/** Models and voices one provider publishes in /config. */
-export function readerChoices(cfg, provider) {
+/**
+ * The models and voices one provider offers, from /config.
+ * A provider with a catalogue (OpenRouter, OpenAI) publishes engines[id].ttsModels: each model carries its
+ * own voices, so the voices follow the model. The others publish a flat list (engines[id].models.tts and
+ * engines[id].voices), and the voices are that list's.
+ */
+export function readerChoices(cfg, provider, model, pick) {
   const e = (cfg && cfg.engines && cfg.engines[provider]) || {}
+  const catalogue = Array.isArray(e.ttsModels) ? e.ttsModels : null
   let models = []
-  if (provider === 'mistral' && e.models && Array.isArray(e.models.tts)) models = e.models.tts.map((m) => ({ id: m.id, label: m.name || m.id }))
-  else if (provider === 'local' && e.models && Array.isArray(e.models.tts)) models = e.models.tts.map((m) => ({ id: m, label: m }))
   let voices = []
-  if (Array.isArray(e.voices)) voices = e.voices.filter((v) => v && v.id && v.id !== 'auto').map((v) => ({ id: v.id, label: v.name || v.id }))
-  else if (e.models && Array.isArray(e.models.tts) && provider === 'grey') voices = e.models.tts.map((v) => ({ id: v, label: v }))
-  return { models, voices }
+  if (catalogue && catalogue.length) {
+    models = catalogue.map((m) => ({ id: m.id, label: m.label || m.id, family: m.family, annotation: m.annotation, default: Boolean(m.default), voices: m.voices || [] }))
+    const own = String(((cfg && cfg.engines && cfg.engines[provider] && cfg.engines[provider].models && cfg.engines[provider].models.tts) || '') + '')
+    const chosen = models.find((m) => m.id === (model || '')) || models.find((m) => m.default) || models.find((m) => m.id === own) || models[0] || null
+    voices = chosen ? (chosen.voices || []).filter((v) => v && v.id).map((v) => ({ id: v.id, label: v.label || v.name || v.id })) : []
+  } else {
+    if (e.models && Array.isArray(e.models.tts)) models = e.models.tts.map((m) => (typeof m === 'string' ? { id: m, label: m } : { id: m.id, label: m.name || m.id }))
+    if (Array.isArray(e.voices)) voices = e.voices.filter((v) => v && v.id && v.id !== 'auto').map((v) => ({ id: v.id, label: v.name || v.id }))
+    // a provider whose voices live in its model list (a Kokoro server names its voices as models)
+    // (the host sends ttsModels: null when a provider has no catalogue, so test for a real list)
+    if (!voices.length && Array.isArray(e.models) && Array.isArray(e.models.tts) && !(Array.isArray(e.ttsModels) && e.ttsModels.length)) voices = e.models.tts.map((v) => ({ id: v, label: v }))
+  }
+  // facets from the ids: language, accent, tone, and the provenance of what could be read
+  const groups = groupVoices(voices)
+  const facets = { languages: groups.facets.languages, accents: groups.facets.accents, tones: groups.facets.tones }
+  const pickLang = pick || {}
+  const visible = filterVoices(voices, pickLang)
+  const voiceOptions = visible.map((v) => ({ id: v.id, label: (v.name || v.id) + (v.tone ? ' [' + v.tone + ']' : '') + (v.languageCode ? '' : ' \u00b7 any language') }))
+  return {
+    models, model: models.find((m) => m.id === (model || '')) || models.find((m) => m.default) || models[0] || null, catalogue: Boolean(catalogue && catalogue.length),
+    voices, voiceOptions, facets, groups: groups.groups,
+  }
+}
+
+/** The annotation family of one provider/model, as /config (and the catalogue) publish it. */
+export function readerAnnotation(cfg, provider, model) {
+  const e = (cfg && cfg.engines && cfg.engines[provider]) || {}
+  const catalogue = Array.isArray(e.ttsModels) ? e.ttsModels : null
+  if (catalogue && catalogue.length) {
+    const chosen = catalogue.find((m) => m.id === (model || '')) || catalogue.find((m) => m.default) || catalogue[0]
+    return { family: chosen.family || 'mute', summary: chosen.annotation || '', label: chosen.label || chosen.id }
+  }
+  const a = (e.v2 && e.v2.annotation) || null
+  return a ? { family: a.family || 'mute', summary: a.summary || '', label: a.label || provider, menu: a.menu } : { family: 'mute', summary: 'annotations are removed', label: provider }
 }
 
 export function ReaderTab(props) {
@@ -90,6 +137,15 @@ export function ReaderTab(props) {
   const model = usePref(MODEL_PICK_KEY, oldRoute.model || '')
   const voice = usePref(VOICE_KEY_PREFIX + provider, oldPick ? readPref(VOICE_KEY_PREFIX + oldPick, '') : '')
   const rate = usePref(RATE_KEY, '1')
+  // the starred voices, and the facet picks of this provider (language, accent, tone)
+  const presetsRaw = usePref(PRESETS_KEY, '[]')
+  let presets = []
+  try { presets = JSON.parse(presetsRaw || '[]') } catch (e) { presets = [] }
+  if (!Array.isArray(presets)) presets = []
+  const facetRaw = usePref(FACET_KEY + provider, '')
+  let facetPick = {}
+  try { facetPick = facetRaw ? JSON.parse(facetRaw) : {} } catch (e) { facetPick = {} }
+  const presetId = usePref(PRESETS_KEY + '.pick.' + provider, '')
   const np = useNowPlaying(READER_ID)
   const [status, setStatus] = React.useState('')
   const [format, setFormat] = React.useState('mp3')
@@ -98,16 +154,25 @@ export function ReaderTab(props) {
   React.useEffect(() => { ensureStyles(); hookSelection(rootRef) }, [])
 
   const update = (t) => { setText(t); if (remember) writePref(TEXT_KEY, t) }
-  const segments = React.useMemo(() => buildSegments(text, { markers: true, detection: 'heuristic', enabled: cfg && cfg.languages && cfg.languages.enabled }).segments, [text, cfg])
-  const choices = readerChoices(cfg, provider)
+  const built = React.useMemo(() => buildSegments(text, { markers: true, detection: 'heuristic', enabled: cfg && cfg.languages && cfg.languages.enabled }), [text, cfg])
+  const segments = built.segments
+  const providers = readerProviders(cfg, presets)
+  const choices = readerChoices(cfg, provider, model, facetPick)
+  const mine = presetsFor(presets, provider, model)
+  const starredNow = presets.some((p) => isPresetOf(p, { provider, model, voice, language: facetPick.language, accent: facetPick.accent, tone: facetPick.tone }))
+  const setFacet = (k, v) => writePref(FACET_KEY + provider, JSON.stringify(Object.assign({}, facetPick, { [k]: v })))
+  const annotation = readerAnnotation(cfg, provider, model)
+  const tags = tagsFor(provider, model, annotation.family)
   const live = np.state === 'speaking' || np.state === 'paused' || np.state === 'working' || np.state === 'fallback'
   const composer = cleanEngine(readPref(PREF_KEY, 'auto'), cfg)
 
   const item = () => {
     const eng = provider || 'auto'
-    const md = takesTags(eng, model) ? text : stripTags(text)
     return {
-      messageId: READER_ID, md, cfg, engine: eng, model: model || '', voice: voice || '', prefs: {}, auto: false,
+      // the text goes as written: the host adapts its annotations to the model (Speech annotations)
+      messageId: READER_ID, md: text, cfg, engine: eng, model: model || '', voice: voice || '', prefs: {}, auto: false,
+      // the text is pasted as plain text: what is spoken is what the view shows, so no Markdown map is needed
+      proseMap: null,
       getContainer: () => viewRef.current,
     }
   }
@@ -237,10 +302,11 @@ export function ReaderTab(props) {
                 aria-label={l === '/' ? 'Insert end marker' : 'Insert ' + label + ' marker'}
                 onClick={() => insertAtCursor((t, a, b) => insertMarker(t, a, b, l))}>{l === '/' ? '[[/]]' : '[[' + l + ']]'}</button>
             ))}
-            {takesTags(provider, model) ? (
-              <select aria-label="Insert a Voxtral tag" value="" className="dv-sel" onChange={(ev) => { const v = ev.target.value; if (v) insertAtCursor((t, a, b) => insertSnippet(t, a, b, v)) }}>
-                <option value="">{'Insert a tag\u2026'}</option>
-                {TAGS.map((g) => <optgroup key={g.group} label={g.group}>{g.items.map((x) => <option key={x} value={x}>{x}</option>)}</optgroup>)}
+            {choices.models.length ? (
+              <select aria-label={'Insert an annotation for ' + tags.label} value="" className="dv-sel" title={'Annotations this model takes (' + annotation.summary + ')'}
+                onChange={(ev) => { const v = ev.target.value; if (v) insertAtCursor((t, a, b) => insertSnippet(t, a, b, v)) }}>
+                <option value="">{'Insert an annotation\u2026'}</option>
+                {tags.menu.groups.map((g) => <optgroup key={g.group} label={g.group}>{g.items.map((x) => <option key={x} value={x}>{x}</option>)}</optgroup>)}
               </select>
             ) : null}
           </div>
@@ -250,8 +316,22 @@ export function ReaderTab(props) {
           <div className="dv-lab">Voice</div>
           <div className="dv-grid" style={{ gridTemplateColumns: 'minmax(0,1fr) 84px' }}>
             <label className="dv-field"><span>Provider</span>
-              <select aria-label="Provider" value={provider} className="dv-sel" onChange={(ev) => { writePref(PROVIDER_KEY, ev.target.value); writePref(MODEL_PICK_KEY, '') }}>
-                {readerProviders(cfg).map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+              <select aria-label="Provider" value={providers.some((p) => p.id === provider) ? provider : (oldRoute.provider || 'auto')} className="dv-sel"
+                onChange={(ev) => {
+                  const v = ev.target.value
+                  const pr = providers.find((p) => p.id === v)
+                  if (pr && pr.preset) {
+                    // a starred preset restores model, voice and its facets in one pick
+                    writePref(PROVIDER_KEY, pr.preset.provider)
+                    writePref(MODEL_PICK_KEY, pr.preset.model || '')
+                    writePref(VOICE_KEY_PREFIX + pr.preset.provider, pr.preset.voice || '')
+                    writePref(FACET_KEY + pr.preset.provider, JSON.stringify({ language: pr.preset.language || '', accent: pr.preset.accent || '', tone: pr.preset.tone || '' }))
+                    writePref(PRESETS_KEY + '.pick.' + pr.preset.provider, pr.preset.id || '')
+                    return
+                  }
+                  writePref(PROVIDER_KEY, v); writePref(MODEL_PICK_KEY, ''); writePref(PRESETS_KEY + '.pick.' + v, '')
+                }}>
+                {providers.map((p) => <option key={p.id} value={p.id} disabled={p.preset ? false : undefined}>{p.label}</option>)}
               </select>
             </label>
             <label className="dv-field"><span>Speed</span>
@@ -261,26 +341,43 @@ export function ReaderTab(props) {
             </label>
           </div>
           {choices.models.length || choices.voices.length ? (
-            <div className="dv-grid">
-              {choices.models.length ? (
-                <label className="dv-field"><span>Model</span>
-                  <select aria-label="Model" value={model} className="dv-sel" onChange={(ev) => writePref(MODEL_PICK_KEY, ev.target.value)}>
-                    <option value="">default model</option>
-                    {choices.models.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-                  </select>
-                </label>
-              ) : null}
-              {choices.voices.length ? (
-                <label className="dv-field"><span>Voice</span>
-                  <select aria-label="Voice" value={voice} className="dv-sel" onChange={(ev) => writePref(VOICE_KEY_PREFIX + provider, ev.target.value)}>
-                    <option value="">default voice</option>
-                    {choices.voices.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
-                  </select>
-                </label>
-              ) : null}
-            </div>
+            <VoiceFields
+              models={choices.models} model={choices.catalogue && choices.model ? choices.model.id : model} catalogue={choices.catalogue}
+              onModel={(v) => { writePref(MODEL_PICK_KEY, v); writePref(VOICE_KEY_PREFIX + provider, ''); writePref(FACET_KEY + provider, '') }}
+              facets={choices.facets} pick={{ language: facetPick.language || '', accent: facetPick.accent || '', tone: facetPick.tone || '' }}
+              onLanguage={(v) => setFacet('language', v)} onAccent={(v) => setFacet('accent', v)} onTone={(v) => setFacet('tone', v)}
+              voice={voice} voiceOptions={choices.voiceOptions} onVoice={(v) => writePref(VOICE_KEY_PREFIX + provider, v)}
+              presets={mine} presetPick={presetId} presetLabel={presetLabel}
+              onPreset={(id) => {
+                const x = presets.find((p) => p.id === id)
+                if (!x) return
+                writePref(MODEL_PICK_KEY, x.model || ''); writePref(VOICE_KEY_PREFIX + provider, x.voice || '')
+                writePref(FACET_KEY + provider, JSON.stringify({ language: x.language || '', accent: x.accent || '', tone: x.tone || '' }))
+                writePref(PRESETS_KEY + '.pick.' + provider, id)
+              }}
+              starred={starredNow}
+              onStar={() => {
+                const chosen = choices.voices.find((v) => v.id === voice)
+                const facets = facetOptions(choices.voices)
+                const fv = facets.voices.find((v) => v.id === voice) || {}
+                const entry = {
+                  provider, providerLabel: (providers.find((p) => p.id === provider) || {}).label || provider,
+                  model: (choices.catalogue && choices.model ? choices.model.id : model) || '',
+                  modelLabel: (choices.model && choices.model.label) || model || '',
+                  voice: voice || '', voiceLabel: (chosen && chosen.label) || fv.name || voice || '',
+                  language: facetPick.language || fv.language || '', accent: facetPick.accent || fv.accent || '', tone: facetPick.tone || fv.tone || '',
+                }
+                const next = togglePreset(presets, entry, !starredNow)
+                writePref(PRESETS_KEY, JSON.stringify(next))
+                writePref(PRESETS_KEY + '.pick.' + provider, starredNow ? '' : (presetKey(entry)))
+              }}
+            />
           ) : null}
-          {provider === 'auto' && composer !== 'auto' ? <div className="dv-hint">{'The composer pick (' + composer + ') is not used here; Auto follows the per-language table.'}</div> : null}
+          {provider === 'auto' ? (
+            <div className="dv-hint">{composer !== 'auto' ? 'The composer pick (' + composer + ') is not used here; Auto follows the per-language table. ' : ''}{'Annotations are adapted per model: ' + annotation.summary + (tags.menu.groups.length ? '' : ' (none on this model, so they are removed)')}</div>
+          ) : (
+            <div className="dv-hint" title={SYNTAX}>{tags.label + ': ' + annotation.summary + (tags.menu.groups.length ? '' : '; annotations are removed for this model')}</div>
+          )}
         </div>
 
         <div className="dv-sec">

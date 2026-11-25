@@ -117,7 +117,10 @@ test('credentials: env, file with NAME, whole file, dsh-ref, chains, literals', 
 test('registry discover: Luca-like env', () => {
   const list = discover(LUCA, { home: tmpDir() })
   const by = Object.fromEntries(list.map((i) => [i.id, i]))
-  assert.deepEqual(Object.keys(by).sort(), ['alibaba', 'browser', 'elevenlabs', 'grey', 'groq', 'lfm3', 'local', 'mimo', 'mistral'])
+  // supertonic joins the discovery list, disabled until SUPERTONIC_TTS_URL is set, and never in auto
+  assert.deepEqual(Object.keys(by).sort(), ['alibaba', 'browser', 'elevenlabs', 'grey', 'groq', 'lfm3', 'local', 'mimo', 'mistral', 'supertonic'])
+  assert.equal(by.supertonic.enabled, false, 'no SUPERTONIC_TTS_URL means not enabled')
+  assert.equal(by.supertonic.inAuto, false, 'a self-hosted engine never joins auto on its own')
   assert.equal(by.elevenlabs.inAuto, false)
   assert.equal(by.elevenlabs.enabled, true)
   assert.equal(by.groq.enabled, false)

@@ -18,6 +18,8 @@ import { autoRead } from './autoread.js'
 import { createDictation, insertAt, caretToDraftOffset, nextDictationLang, levelOf } from './dictation.js'
 import { registerMic, findComposerEditor, DICT_LANG_KEY } from './mic-registry.js'
 import { Icon } from './ui.jsx'
+import { facetOptions, groupVoices, filterVoices, HIDDEN_PROVIDERS, presetsFor, togglePreset, isPresetOf, presetLabel, presetKey } from './voices.js'
+import { VoiceFields } from './voice-fields.js'
 
 export const BTN = {
   background: 'transparent', border: 'none', cursor: 'pointer',
@@ -39,6 +41,17 @@ export function messageText(chatSnapshot, messageId) {
   } catch (e) { /* snapshot shape changed: read nothing rather than crash */ }
   return ''
 }
+
+/** Per-engine keys of the voice picker's facets and model pick, and the starred presets (shared with the reader tab). */
+const FACET_KEY = 'dsh-voice.v2.reader.facets.'
+const PRESETS_KEY = 'dsh-voice.v2.presets'
+const MODEL_PICK_ENGINE_KEY = 'dsh-voice.v2.reader.model.'
+const VOICE_KEY_PREFIX = 'dsh-tts-reader.voice.'
+const PRETTY = (id, cfg) => String((((cfg || {}).providers || []).find((p) => p.id === id) || {}).label || id)
+const readPresets = () => { try { const v = JSON.parse(readPref(PRESETS_KEY, '[]') || '[]'); return Array.isArray(v) ? v : [] } catch (e) { return [] } }
+const facetPickOf = (engine) => { try { return JSON.parse(readPref(FACET_KEY + engine, '') || '{}') } catch (e) { return {} } }
+const setFacetPick = (engine, k, v) => writePref(FACET_KEY + engine, JSON.stringify(Object.assign({}, facetPickOf(engine), { [k]: v })))
+const engineVoiceKey = (engine) => (engine === 'mimo' ? MIMOVOICE_KEY : engine === 'local' ? VOICE_KEY : VOICE_KEY_PREFIX + engine)
 
 const LANG_LABEL = { marker: 'marked in the text', model: 'detected by the model', heuristic: 'detected from the words', script: 'detected from the script', smoothed: 'follows the neighbouring sentence', default: 'message default', manual: 'chosen by hand', mixed: 'detected' }
 
@@ -64,8 +77,13 @@ export function SpeakAction(props) {
   const prefsRef = React.useRef(prefs)
   prefsRef.current = prefs
 
+  // built is the Markdown split into segments; its map takes a prose offset back to the message, so the
+  // highlight keeps following the words on screen through headings, emphasis markers and removed tags
+  const builtRef = React.useRef(built)
+  builtRef.current = built
   const item = (code, auto) => ({
     messageId: props.messageId, md, code: Boolean(code), cfg, engine, prefs: prefsRef.current, auto: Boolean(auto),
+    proseMap: code ? null : (builtRef.current && builtRef.current.map) || null,
     getContainer: (probe) => findMessageContainer(rowRef.current, probe),
   })
 
@@ -334,9 +352,8 @@ export function MicAction(props) {
   push('mimo', 'Xiaomi MiMo (TTS + ASR)', Boolean(e.mimo && e.mimo.available), e.mimo && e.mimo.note)
   push('mistral', 'Mistral (Voxtral)', !e.mistral || e.mistral.available !== false, e.mistral && e.mistral.note)
   push('elevenlabs', 'ElevenLabs', Boolean(e.elevenlabs && e.elevenlabs.available), e.elevenlabs && e.elevenlabs.note)
-  push('lfm3', 'Liquid LFM3 Audio (this box)', Boolean(e.lfm3 && e.lfm3.available), e.lfm3 && e.lfm3.note)
   push('local', 'Local (this box)', Boolean(e.local && e.local.available), e.local && e.local.note)
-  push('grey', (e.grey && e.grey.v2 && e.grey.v2.label) || 'Kokoro (remote)', Boolean(e.grey && e.grey.available), e.grey && e.grey.note)
+  // Kokoro and Liquid are not offered any more (2026-11-25); a saved pick still routes, nothing else
   ;((cfg && cfg.providers) || []).forEach((p) => {
     if (MENU_ENGINES.indexOf(p.id) >= 0 || p.type === 'browser' || !p.enabled) return
     if (['groq', 'alibaba'].indexOf(p.id) >= 0) return
@@ -351,6 +368,22 @@ export function MicAction(props) {
   const langChip = dictLang === 'auto' ? (heard ? 'Auto: ' + heard.toUpperCase() : 'Auto') : String(dictLang).toUpperCase()
   const cur = currentAudio()
   const voices = (id) => (((cfg || {}).engines || {})[id] || {}).voices
+  // the catalogue of the engine's model (a provider with ttsModels), else its flat voice list
+  const eng = (cfg && cfg.engines && cfg.engines[engine]) || {}
+  const catalogue = Array.isArray(eng.ttsModels) ? eng.ttsModels : null
+  const modelPick = readPref(MODEL_PICK_ENGINE_KEY + engine, '')
+  const chosenModel = catalogue ? (catalogue.find((m) => m.id === modelPick) || catalogue.find((m) => m.default) || catalogue[0]) : null
+  const catalogueVoices = chosenModel ? (chosenModel.voices || []).filter((v) => v && v.id).map((v) => ({ id: v.id, label: v.label || v.name || v.id })) : []
+  const flatVoices = (voices(engine) || []).filter((v) => v && v.id && v.id !== 'auto').map((v) => ({ id: v.id, label: v.name || v.id }))
+  const voiceSource = catalogue ? catalogueVoices : flatVoices
+  const voiceKey = engine === 'mimo' ? MIMOVOICE_KEY : engine === 'local' ? 'dsh-voice.voice' : VOICE_KEY
+  const voiceNow = engine === 'mimo' ? mimoVoiceSel : engine === 'local' ? readPref('dsh-voice.voice', 'auto') : elVoice
+  const groups = groupVoices(voiceSource)
+  const picked = facetPickOf(engine)
+  const visible = filterVoices(voiceSource, picked)
+  const presetsAll = readPresets()
+  const mine = presetsFor(presetsAll, engine, catalogue ? (chosenModel && chosenModel.id) || '' : '')
+  const starredNow = presetsAll.some((x) => isPresetOf(x, { provider: engine, model: catalogue ? (chosenModel && chosenModel.id) || '' : '', voice: voiceNow === 'auto' ? '' : voiceNow, language: picked.language, accent: picked.accent, tone: picked.tone }))
   const el = elevenOf(cfg)
   const q = quota || el.quota
 
@@ -383,24 +416,6 @@ export function MicAction(props) {
       <select value={rateSel} title="Read-aloud speed (pitch preserved; dictation unaffected)" aria-label="Read-aloud speed"
         onChange={(ev) => { writePref(RATE_KEY, ev.target.value); const c = currentAudio(); if (c && c.tagName === 'AUDIO') c.playbackRate = parseFloat(ev.target.value) }}
         style={SEL}>{RATES.map((v) => <option key={v} value={v}>{v + '\u00d7'}</option>)}</select>
-      {engine === 'mimo' && voices('mimo') && voices('mimo').length ? (
-        <select value={mimoVoiceSel} aria-label="MiMo voice" onChange={(ev) => writePref(MIMOVOICE_KEY, ev.target.value)} style={Object.assign({}, SEL, { maxWidth: '150px' })}
-          title={'Which MiMo-V2.5-TTS voice reads aloud. Built-in voices use mimo-v2.5-tts; "designed" uses the voicedesign model; "cloned" the voiceclone model. Dictation always uses mimo-v2.5-asr.'}>
-          {voices('mimo').map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-        </select>
-      ) : null}
-      {engine === 'lfm3' && voices('lfm3') && voices('lfm3').length ? (
-        <select value={lfm3VoiceSel} aria-label="LFM3 voice" onChange={(ev) => writePref(LFM3VOICE_KEY, ev.target.value)} style={Object.assign({}, SEL, { maxWidth: '130px' })}
-          title="Which LFM3-Audio voice reads aloud. Free and unlimited, but it borrows the GPU, and the first read after something else used the card pays a model load.">
-          {voices('lfm3').map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-        </select>
-      ) : null}
-      {engine === 'elevenlabs' && el.available && q ? (
-        <span aria-label="ElevenLabs characters remaining" style={{ fontSize: '11px', whiteSpace: 'nowrap', cursor: 'help', opacity: charsLeftIn(cfg, q) <= 0 ? 0.95 : 0.55, padding: '0 2px' }}
-          title={(charsLeftIn(cfg, q) <= 0 ? 'No ElevenLabs characters left in this period. ' : 'About ' + fmtChars(charsLeftIn(cfg, q)) + ' characters of ElevenLabs speech left. ') + quotaText(q) + '. About half a credit per character on flash v2.5.'}>
-          {charsLeftIn(cfg, q) <= 0 ? '0 chars' : fmtChars(charsLeftIn(cfg, q)) + ' chars'}
-        </span>
-      ) : null}
       {engine === 'local' && e.local && e.local.models ? (
         <select value={localModel} aria-label="Local model" onChange={(ev) => writePref(MODEL_KEY, ev.target.value)} style={Object.assign({}, SEL, { maxWidth: '150px' })}
           title="Which model THIS box uses. Reading aloud and dictation use different groups; model: auto keeps each side's default (Maya1 for voices, fast whisper for dictation). Switching pays a one-off model load.">
@@ -409,18 +424,39 @@ export function MicAction(props) {
           {(e.local.models.stt || []).length ? <optgroup key="s" label="dictation">{e.local.models.stt.map((id) => <option key={'s' + id} value={id}>{LM_LABELS[id] || id}</option>)}</optgroup> : null}
         </select>
       ) : null}
-      {engine === 'elevenlabs' && el.voices && el.voices.length ? (
-        <select value={elVoice} aria-label="ElevenLabs voice" onChange={(ev) => writePref(VOICE_KEY, ev.target.value)} style={Object.assign({}, SEL, { maxWidth: '150px' })}
-          title={'Which ElevenLabs voice reads aloud: ' + el.voices.length + ' on this account. ' + (quotaText(q) ? quotaText(q) + '. ' : '') + 'Billed per character.'}>
-          <option key="auto" value="auto">voice: account default</option>
-          {el.voices.map((v) => <option key={v.id} value={v.id} title={voiceLabel(v) + (v.category ? ' \u00b7 ' + v.category : '')}>{voiceLabel(v)}</option>)}
-        </select>
-      ) : null}
-      {engine === 'alibaba' && voices('alibaba') && voices('alibaba').length ? (
-        <select value={aliVoice} aria-label="Alibaba voice" onChange={(ev) => writePref(ALIVOICE_KEY, ev.target.value)} style={Object.assign({}, SEL, { maxWidth: '130px' })} title="Which Qwen3-TTS voice reads aloud.">
-          <option key="auto" value="auto">voice: Cherry</option>
-          {voices('alibaba').map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-        </select>
+      {engine !== 'browser' && engine !== 'local' && voiceSource.length ? (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+          <VoiceFields
+            models={catalogue && engine !== 'local' ? catalogue.map((m) => ({ id: m.id, label: m.label || m.id })) : null}
+            model={catalogue ? (chosenModel && chosenModel.id) || '' : ''} catalogue={Boolean(catalogue)}
+            onModel={(v) => { writePref(MODEL_PICK_ENGINE_KEY + engine, v); writePref(VOICE_KEY_PREFIX + engine, '') }}
+            facets={{ languages: groups.facets.languages, accents: groups.facets.accents, tones: groups.facets.tones }}
+            pick={{ language: picked.language || '', accent: picked.accent || '', tone: picked.tone || '' }}
+            onLanguage={(v) => setFacetPick(engine, 'language', v)} onAccent={(v) => setFacetPick(engine, 'accent', v)} onTone={(v) => setFacetPick(engine, 'tone', v)}
+            voice={voiceNow === 'auto' ? '' : voiceNow} voiceOptions={visible.map((v) => ({ id: v.id, label: (v.name || v.id) + (v.tone ? ' [' + v.tone + ']' : '') + (v.language ? '' : ' \u00b7 any language') }))}
+            onVoice={(v) => writePref(voiceKey, v || 'auto')}
+            presets={mine} presetPick="" presetLabel={presetLabel}
+            onPreset={(id) => {
+              const x = presetsAll.find((p) => p.id === id)
+              if (!x) return
+              writePref(PREF_KEY, x.provider)
+              if (catalogue) writePref(MODEL_PICK_ENGINE_KEY + x.provider, x.model || '')
+              writePref(engineVoiceKey(x.provider), x.voice || 'auto')
+              writePref(FACET_KEY + x.provider, JSON.stringify({ language: x.language || '', accent: x.accent || '', tone: x.tone || '' }))
+            }}
+            starred={starredNow}
+            onStar={() => {
+              const fv = facetOptions(voiceSource).voices.find((v) => v.id === voiceNow) || {}
+              const entry = {
+                provider: engine, providerLabel: PRETTY(engine, cfg), model: catalogue ? (chosenModel && chosenModel.id) || '' : '', modelLabel: (chosenModel && chosenModel.label) || '',
+                voice: voiceNow === 'auto' ? '' : voiceNow, voiceLabel: fv.name || voiceNow || '',
+                language: picked.language || fv.language || '', accent: picked.accent || fv.accent || '', tone: picked.tone || fv.tone || '',
+              }
+              writePref(PRESETS_KEY, JSON.stringify(togglePreset(presetsAll, entry, !starredNow)))
+            }}
+            text={{ model: '', preset: '', language: 'Lang', accent: 'Accent', voice: 'voice', tone: 'Tone', save: 'star', saved: 'starred', star: 'Star this voice', unstar: 'Unstar this voice', languageAny: 'any', accentAny: 'any', toneAny: 'any', voiceDefault: 'default' }}
+          />
+        </span>
       ) : null}
       <button type="button" aria-label="Rewind 15 seconds" title="Rewind 15 seconds (server audio only, not the browser voice)"
         disabled={!cur || cur.tagName !== 'AUDIO'}

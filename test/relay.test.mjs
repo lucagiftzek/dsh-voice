@@ -24,7 +24,7 @@ async function relays(mode) {
   return { kokoro, mimo }
 }
 
-async function relayEnv(kokoro, mimo) {
+async function federicoEnv(kokoro, mimo) {
   return {
     MIMO_TOKEN_PLAN_API_KEY: 'fake-mimo-key',
     MIMO_TOKEN_PLAN_BASE_URL: 'http://127.0.0.1:' + mimo.port + '/v1',
@@ -38,7 +38,7 @@ async function relayEnv(kokoro, mimo) {
 
 test('Relayed install contract: only POST /api/tts and POST /v1/chat/completions ever reach the relays', async () => {
   const { kokoro, mimo } = await relays('on')
-  const v = await voiceServer(await relayEnv(kokoro, mimo))
+  const v = await voiceServer(await federicoEnv(kokoro, mimo))
   try {
     const cfg = await v.call('GET', '/config')
     assert.equal(cfg.status, 200)
@@ -79,7 +79,7 @@ test('Relayed install contract: only POST /api/tts and POST /v1/chat/completions
 
 test('Relayed install: /config alone sends nothing to the relays', async () => {
   const { kokoro, mimo } = await relays('on')
-  const v = await voiceServer(await relayEnv(kokoro, mimo))
+  const v = await voiceServer(await federicoEnv(kokoro, mimo))
   try {
     for (let k = 0; k < 2; k += 1) assert.equal((await v.call('GET', '/config')).status, 200)
     assert.equal(kokoro.reqs.length, 0)
@@ -93,7 +93,7 @@ test('Relayed install: STT through MiMo is a model-gated chat completion', async
     if (!(r.method === 'POST' && r.url === '/v1/chat/completions' && MODEL_RE.test(String((r.json() || {}).model)))) return reply(res, 404, { error: 'path not relayed' })
     return reply(res, 200, { choices: [{ message: { content: 'relayed words' } }] })
   })
-  const v = await voiceServer(await relayEnv(kokoro, mimo))
+  const v = await voiceServer(await federicoEnv(kokoro, mimo))
   try {
     const wav = wavBuffer()
     const b = '----bb'
@@ -109,7 +109,7 @@ test('Relayed install: STT through MiMo is a model-gated chat completion', async
 
 test('Relay kill switch (503) gives a typed 502 vendor error, no crash', async () => {
   const { kokoro, mimo } = await relays('off')
-  const v = await voiceServer(await relayEnv(kokoro, mimo))
+  const v = await voiceServer(await federicoEnv(kokoro, mimo))
   try {
     const g = await v.call('POST', '/tts', { body: { text: 'hello', provider: 'grey' } })
     assert.equal(g.status, 502)

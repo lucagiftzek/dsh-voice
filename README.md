@@ -1,20 +1,5 @@
 # dsh-voice
 
-[![npm](https://img.shields.io/npm/v/%40lucagiftzek%2Fdsh-voice?label=npm)](https://www.npmjs.com/package/@lucagiftzek/dsh-voice)
-
-Read-aloud and dictation for DSH with 23 TTS and STT providers, per-language routing and word highlighting.
-
-```bash
-dsh plugin --profile web add dsh-better-sidebar   # the tab host, skip if installed
-dsh plugin --profile web add @lucagiftzek/dsh-voice
-# or from GitHub: dsh plugin --profile web add github:lucagiftzek/dsh-voice
-# restart dsh web, then pick your speech providers in Settings, Voice
-```
-
-![The TTS Reader tab with English, Italian and Greek text](docs/media/demo.png)
-
-<sub>Screenshot from a demo DSH instance with sample data.</sub>
-
 Read-aloud, dictation and language-aware speech for the DeepSeek Harness (DSH) web UI.
 
 - A speaker on every finished assistant reply (and a `{ }` button that reads the code blocks).
@@ -28,18 +13,9 @@ Read-aloud, dictation and language-aware speech for the DeepSeek Harness (DSH) w
 
 - A **TTS Reader** sidebar tab, push-to-talk **dictation** at the composer cursor, and **keyboard shortcuts**.
 
-Status: 2.0.0. 23 provider types, EU vendors first; see [CHANGELOG.md](CHANGELOG.md). Runs on DSH 0.2.x (tested on 0.2.1) and DSH 0.1.5.
+Status: 2.1.0 plus the speech tools listed under [Unreleased](CHANGELOG.md). **25 provider types, EU vendors first**, two of them able to run on your own machine (Kokoro and Supertonic 3). See [CHANGELOG.md](CHANGELOG.md).
 
-## Install
-
-Install from npm: `dsh plugin --profile web add @lucagiftzek/dsh-voice`, or from GitHub: `dsh plugin --profile web add github:lucagiftzek/dsh-voice`.
-
-```sh
-dsh plugin --profile web add @lucagiftzek/dsh-voice
-# or from GitHub: dsh plugin --profile web add github:lucagiftzek/dsh-voice
-```
-
-The package declares `dsh.bundle`, so `dsh plugin add` lists it in the profile bundles; restart `dsh web` to load the host half. `lib/` is committed, so no build step is needed. From a checkout instead: `git clone https://github.com/lucagiftzek/dsh-voice`, then `dsh plugin --profile web add link:$PWD/dsh-voice`. Then open Settings > Voice, add a provider and press Test.
+![dsh-voice in the DSH web UI](docs/media/demo.png)
 
 ## Providers
 
@@ -68,6 +44,7 @@ Settings > Voice lists providers in three groups, **EU first**, then **Others**,
 | `google` Google Cloud Speech (partly verified) | yes | yes | word | EU regions selectable | check the vendor pricing page (Neural2 and Chirp 3 HD differ) | [docs](https://docs.cloud.google.com/text-to-speech/docs/reference/rest) |
 | `amazon` Amazon Polly and Transcribe (partly verified) | yes | yes | word | EU regions selectable | Polly neural about $16 per 1M characters; Transcribe per second | [docs](https://docs.aws.amazon.com/polly/latest/dg/what-is.html) |
 | `openai` OpenAI | yes | yes | estimated | Outside the EU | per character (TTS) and per minute (STT), see the pricing page | [docs](https://developers.openai.com/api/docs/guides/text-to-speech) |
+| `openrouter` OpenRouter | yes | yes | estimated | Depends on the endpoint | set by the vendor of each model (a few models have a free :free variant) | [docs](https://openrouter.ai/docs/guides/overview/multimodal/tts) |
 | `openai-compatible` OpenAI-compatible (partly verified) | per preset | per preset | Kokoro-FastAPI captions, else estimated | Depends on the endpoint | depends on the server (free when self-hosted) | [docs](https://platform.openai.com/docs/api-reference/audio) |
 | `fish` Fish Audio (partly verified) | yes | yes | estimated | Outside the EU | check the vendor pricing page | [docs](https://docs.fish.audio/api-reference/endpoint/openapi-v1/text-to-speech) |
 | `cartesia` Cartesia (partly verified) | yes | yes | word | Outside the EU | check the vendor pricing page | [docs](https://docs.cartesia.ai/api-reference/tts/bytes) |
@@ -81,7 +58,8 @@ Settings > Voice lists providers in three groups, **EU first**, then **Others**,
 | Provider | TTS | STT | Word timings | Data residency | Price note | Docs |
 |---|---|---|---|---|---|---|
 | `elevenlabs-compatible` Self-hosted (ElevenLabs-compatible) | yes | yes | word (from characters) | Self-hosted | free (your server) | [docs](https://elevenlabs.io/docs/api-reference/text-to-speech/convert) |
-| `tzekos-native` Kokoro (native /api/tts) | yes | no | estimated | Self-hosted | free (your server) | [docs](https://github.com/hexgrad/kokoro) |
+| `tzekos-native` Kokoro (tzekos-tts native) | yes | no | estimated | Self-hosted | free (your server) | [docs](https://github.com/hexgrad/kokoro) |
+| `supertonic` Supertonic 3 (self-hosted, Rust) | yes | no | estimated | Self-hosted | free (your server) | [docs](https://huggingface.co/Supertone/supertonic-3) |
 | `lfm3` Liquid LFM3 Audio (local) | yes | yes | estimated | Self-hosted | free (local) | [docs](https://huggingface.co/LiquidAI) |
 | `piper` Piper (self-hosted) | yes | no | estimated | Self-hosted | free (local) | [docs](https://github.com/OHF-Voice/piper1-gpl/blob/main/docs/API_HTTP.md) |
 | `xtts` Coqui XTTS-v2 (self-hosted) (partly verified) | yes | no | estimated | Self-hosted | free (local, non-commercial licence) | [docs](https://github.com/daswer123/xtts-api-server) |
@@ -89,7 +67,7 @@ Settings > Voice lists providers in three groups, **EU first**, then **Others**,
 
 <!-- providers:end -->
 
-Providers are not picked up from the environment unless they are the 1.x engines (Mistral, MiMo, a local TTS server, Kokoro server, LFM3, ElevenLabs, Groq, Alibaba, which keep working with no settings at all). Every other provider is added in Settings > Voice (credential pointer, region, preset), then chosen per language.
+Providers are not picked up from the environment unless they are the 1.x engines (Mistral, MiMo, Tzekos, Kokoro server, LFM3, ElevenLabs, Groq, Alibaba, which keep working with no settings at all). Every other provider is added in Settings > Voice (credential pointer, region, preset), then chosen per language.
 
 ## Setup per provider
 
@@ -175,7 +153,15 @@ OpenAI speech: gpt-4o-mini-tts and tts-1 voices, whisper-1 word timings, gpt-tra
 
 Residency: Default api.openai.com processes in the US. The EU host eu.api.openai.com stores and processes in the EEA and Switzerland, but needs OpenAI sales approval and Modified Abuse Monitoring or Zero Data Retention, and costs 10 percent more. TTS languages: any. STT languages: any. Presets: OpenAI, OpenAI EU (data residency, needs approval). Credential: the API key. The `openai-eu` preset needs an EU data-residency project with approval from OpenAI. The TTS models retire on 2027-01-06 and whisper-1 plus the gpt-4o transcribe family on 2027-02-26.
 
-Verification: Fetched 2026-10-31: developers.openai.com text-to-speech guide (13 voices, tts-1 and tts-1-hd limited to 9, response formats, languages follow Whisper including Greek and Italian), speech-to-text guide (gpt-transcribe recommended, `languages` replaces `language` for it, response carries `languages: [{code}]`, whisper-1 gives word timestamps via verbose_json and timestamp_granularities[], 25 MB limit), deprecations page (tts-1, tts-1-hd, gpt-4o-mini-tts shut down 2027-01-06; whisper-1 and gpt-4o transcribe models 2027-02-26) and the your-data page (EU host eu.api.openai.com, regional storage and processing, MAM or ZDR required, sales eligibility, 10 percent uplift). Unverified: maximum input length of /audio/speech (4096 characters assumed), word timestamps for gpt-transcribe (treated as json only), speed range 0.25 to 4 (from memory of the API reference).
+Verification: Fetched 2026-10-31: developers.openai.com text-to-speech guide (13 voices, tts-1 and tts-1-hd limited to 9, response formats, languages follow Whisper including Greek and Italian), speech-to-text guide (gpt-transcribe recommended, `languages` replaces `language` for it, response carries `languages: [{code}]`, whisper-1 gives word timestamps via verbose_json and timestamp_granularities[], 25 MB limit), deprecations page (tts-1, tts-1-hd, gpt-4o-mini-tts shut down 2027-01-06; whisper-1 and gpt-4o transcribe models 2027-02-26) and the your-data page (EU host eu.api.openai.com, regional storage and processing, MAM or ZDR required, sales eligibility, 10 percent uplift). Unverified: maximum input length of /audio/speech (4096 characters assumed), word timestamps for gpt-transcribe (treated as json only).
+
+#### OpenRouter (`openrouter`)
+
+One key for many vendors' speech models (ElevenLabs, Gemini TTS, Voxtral, Fish, HeyGen, Kokoro) with their voices, plus transcription.
+
+Residency: US router. Each request goes to the vendor of the chosen model, so residency and price follow that vendor: pick EU vendors, or pin an EU endpoint with the instance option "Prefer providers" (for example mistral/eu). TTS languages: any. STT languages: any. Presets: OpenRouter. Credential: the OpenRouter API key. A voice belongs to one model, so pick the model and its voice together (the reader menus list the voices of the chosen model). The vendor of the model sets the residency and the price: option `preferProviders` pins an endpoint such as `mistral/eu`, `onlyProviders` limits the endpoints, `zdr` routes only to endpoints that keep no logs. The speech catalogue is read live, so a model added on OpenRouter appears without a plugin change.
+
+Verification: Checked live on 2026-11-25 against the running service and its TTS guide: GET /api/v1/audio/speech/models (public, one entry per model with output_modalities[].supported_parameters: voice enum, response_format enum mp3 or pcm, speed range, instructions), POST /api/v1/audio/speech (raw audio bytes; Voxtral TTS 3 and ElevenLabs v3 answered audio/mpeg, the free HeyGen Voice answered audio/pcm;rate=44100;channels=1 and was wrapped into a WAV; speed was accepted by Eleven v3, whose catalogue publishes a range, and silently ignored by Voxtral TTS 3, which publishes none), POST /api/v1/audio/transcriptions (multipart file and model; openai/whisper-large-v3-turbo and mistralai/voxtral-mini-transcribe-3-0 answered text, and verbose_json with timestamp_granularities[] gave language, duration and words). Errors: an unknown voice is a 404 "Provider returned 404", an unknown model a 400 "Model ... does not exist", mp3 on a PCM-only model a 400 naming response_format. Unverified: the sample rate of PCM models other than HeyGen (the header is trusted), prices, and every model that was not called.
 
 #### OpenAI-compatible (`openai-compatible`)
 
@@ -235,19 +221,27 @@ Verification: Carried from the 1.x adapter (live in 2026-09); legacy, off unless
 
 #### Self-hosted (ElevenLabs-compatible) (`elevenlabs-compatible`)
 
-Any server speaking the ElevenLabs request shape (preset: Local TTS server, a loopback server with a native /api/tts route).
+Any server speaking the ElevenLabs request shape (preset: Tzekos, a loopback tzekos-tts).
 
-Residency: Self-hosted: data stays wherever the server runs TTS languages: any. STT languages: any. Presets: Local TTS server, Generic ElevenLabs-compatible server. Credential: the server key. The Local TTS server preset points at a loopback server (`http://127.0.0.1:8771`).
+Residency: Self-hosted: data stays wherever the server runs TTS languages: any. STT languages: any. Presets: Tzekos, Generic ElevenLabs-compatible server. Credential: the server key. The Tzekos preset points at a loopback server (`http://127.0.0.1:8771`).
 
-Verification: Verified against a self-hosted reference server (Kokoro and Whisper behind native and ElevenLabs-shaped routes). Other servers with this shape are untested.
+Verification: Verified against the reference tzekos-tts server source (native and ElevenLabs-shaped routes). Other servers with this shape are untested.
 
-#### Kokoro (native /api/tts) (`tzekos-native`)
+#### Kokoro (tzekos-tts native) (`tzekos-native`)
 
-A Kokoro-82M server with a native POST /api/tts call, for example behind a relay (CPU is enough).
+A Kokoro-82M server with the tzekos-tts native POST /api/tts call (CPU only).
 
-Residency: Self-hosted: data stays wherever the server runs TTS languages: en. Presets: Kokoro server. Credential: the server key. Only `POST /api/tts` is ever called.
+Residency: Self-hosted: data stays wherever the server runs TTS languages: en es fr hi it ja pt zh. Presets: Kokoro server. Credential: the server key. Only `POST /api/tts` is ever called.
 
 Verification: Verified against the reference Kokoro server and the relay contract (POST /api/tts only, no probes).
+
+#### Supertonic 3 (self-hosted, Rust) (`supertonic`)
+
+Supertonic 3 on the resident Rust service: 10 voices, 32 languages including Greek, CPU only.
+
+Residency: Self-hosted: data stays wherever the server runs TTS languages: ar bg hr cs da nl en et fi fr de el hi hu id it ja ko lv lt pl pt ro ru sk sl es sv tr uk vi. Presets: Supertonic service. Run the resident service on the speech machine (Supertonic 3 weights, port 8791), then set `SUPERTONIC_TTS_URL` and `SUPERTONIC_API_KEY` in the environment, or add an instance with `baseUrl` in Settings. Voice styles M1-M5 and F1-F5 each work in all 31 languages; `language` is passed per request and an unknown tag becomes `na` so the model decides.
+
+Verification: Verified against the resident server built from the supertonic3-tts crate: POST /api/tts with {text, voice, language} and an xi-api-key, answering WAV at 44.1 kHz.
 
 #### Liquid LFM3 Audio (local) (`lfm3`)
 
@@ -298,9 +292,20 @@ An instance stores a pointer, resolved at call time:
 
 With no settings at all, the instances are discovered from the same environment variables 1.x read (`MISTRAL_API_KEY`, `MIMO_TOKEN_PLAN_API_KEY` / `MIMO_TOKEN_PLAN_BASE_URL` or the MiMo credentials file, `TTS_API_KEY` with `DSH_VOICE_TTS_HOST/PORT`, `GREY_TTS_URL` / `GREY_TTS_API_KEY`, `DSH_VOICE_LFM3_HOST/PORT`, `ELEVENLABS_API_KEY`, `GROQ_API_KEY`, `ALIBABA_*`), so an existing install keeps working without a config edit.
 
+### Self-hosted engines beside the cloud
+
+Two engines can run on your own machine and appear anywhere in the pickers. Both are worth noting because they cost nothing per call and keep the text on your hardware:
+
+| type | what it is | languages | voices |
+|---|---|---|---|
+| `tzekos-native` | Kokoro 82M behind a small HTTP service | 9 (no Greek) | 54, each with an accent and a personality |
+| `supertonic` | Supertonic 3 on a resident Rust service | 31, **Greek included** | 10 fixed styles, each usable in every language |
+
+Point at them with `GREY_TTS_URL` and `SUPERTONIC_TTS_URL` plus their keys, or add an instance with a `baseUrl` in Settings. Neither is ever chosen by automatic routing unless you put it in a language chain: a self-hosted engine is a decision, not a default. On the reference speech box (4-core i7, no GPU) Kokoro holds 643 MB and Supertonic 469 MB, so both can stay resident together.
+
 ## Routing
 
-`perLanguage.<lang>.tts` and `.stt` hold `{provider, model, voice, speed, fallback[]}`. The shipped value for every language is `provider: auto`, which is the built-in 1.x chain: English goes to MiMo, then Mistral; Greek, Italian and the rest go to the local TTS server (for example Maya1 and Whisper); ElevenLabs stays selectable but out of automatic routing. "Apply recommended" in Settings fills in the EU-first recommendation per language (Mistral for English and Italian, ElevenLabs for Greek, with fallbacks) for you to review and save.
+`perLanguage.<lang>.tts` and `.stt` hold `{provider, model, voice, speed, fallback[]}`. The shipped value for every language is `provider: auto`, which is the built-in 1.x chain: English goes to MiMo, then Mistral; Greek, Italian and the rest go to the local Tzekos engine (Maya1, whisper); ElevenLabs stays selectable but out of automatic routing. "Apply recommended" in Settings fills in the EU-first recommendation per language (Mistral for English and Italian, ElevenLabs for Greek, with fallbacks) for you to review and save.
 
 ### Per-language defaults
 
@@ -349,7 +354,46 @@ The speaker shows the language being read as a small badge (EN, IT, EL), with ho
 
 ## TTS Reader tab
 
-A tab of dsh-better-sidebar (id `dsh-tts-reader:main`, title "TTS Reader", so a saved sidebar layout keeps it; it replaces the separate dsh-tts-reader package, which is now a stub that registers nothing). Text comes from typing or pasting, the current reply, the selection in the chat, or a `.txt`, `.md` or `.html` file opened from this computer (read in the browser, nothing is uploaded). Buttons insert `[[en]]`, `[[it]]`, `[[el]]` and `[[/]]` at the cursor (around the selection when there is one); with Voxtral TTS 3 a menu inserts its emotion, pace and sound tags, which no other engine receives. The provider, model, voice and speed apply to this read only. The reading view shows the text per language with a chip each and the same highlight as the chat. **Download audio** writes the whole text as one MP3, or as one WAV when the voices differ in format or the text has pauses (the browser voice cannot be exported). The sidebar is optional: without dsh-better-sidebar everything else loads.
+A tab of dsh-better-sidebar (id `dsh-tts-reader:main`, title "TTS Reader", so a saved sidebar layout keeps it; it replaces the separate dsh-tts-reader package, which is now a stub that registers nothing). Text comes from typing or pasting, the current reply, the selection in the chat, or a `.txt`, `.md` or `.html` file opened from this computer (read in the browser, nothing is uploaded). Buttons insert `[[en]]`, `[[it]]`, `[[el]]` and `[[/]]` at the cursor (around the selection when there is one); the tag menu inserts speech annotations ([tone=happy], [pace=slow], [pitch=high], [volume=soft], [laugh], [pause], [strongly excited]) in one syntax, and the plugin adapts each to the selected model (see Speech annotations below); any annotation the selected model cannot take is removed, never read. The provider, model, voice and speed apply to this read only. The reading view shows the text per language with a chip each and the same highlight as the chat. **Download audio** writes the whole text as one MP3, or as one WAV when the voices differ in format or the text has pauses (the browser voice cannot be exported). The sidebar is optional: without dsh-better-sidebar everything else loads.
+
+## Speech annotations
+
+One syntax works on every model, and the plugin adapts each annotation to what the selected model can actually do, so a tone you write
+never turns into a word the voice reads aloud. The annotation layer is `lib/shared/annotations.js` (pure, bundled into the browser).
+
+| Annotation | Meaning |
+|---|---|
+| `[tone=happy]` `[emotion=warm]` | a tone, from the shared TONE list (or one the family documents itself) |
+| `[pace=slow]` `[rate=very fast]` | very-slow, slow, moderate, fast, very-fast |
+| `[pitch=high]` `[volume=soft]` | pitch high/up/down/low; volume soft/quiet/loud/shout |
+| `[emphasis]` or `**word**` | stress the word or phrase that follows |
+| `[laugh]` `[sigh]` `[breath]` `[pause]` `[long pause]` | a sound or a real silence |
+| `[slightly sad]` `[strongly excited]` | a strength laid over a value |
+
+What reaches each model family, as documented by the vendor on 2026-11-25 (the exact sources are in the `verification` note of each entry of
+`ADAPTATION`):
+
+| Family | Tone | Pace | Pitch | Volume | Sounds | Mechanism |
+|---|---|---|---|---|---|---|
+| Voxtral TTS 3 (Mistral) | yes | yes | no | no | yes | `[emotion=]`, `[pace=]`, `[laugh]` |
+| ElevenLabs v3 and v4 | yes | yes | no | yes | yes | `[whispering]`, `[laughs]`, `[slowly]` |
+| Gemini 3.8 TTS | yes | yes | yes | yes | yes | angle tags `<laugh>` plus `speech_metadata.style` |
+| HeyGen Voice | yes | yes | yes | yes | yes | `[sad]`, `[slightly sad]`, `[laughs]`, `[slowly]` |
+| Fish Audio S2 and Drama 3 | yes | yes | yes | yes | yes | free-text `[very excited]`, `[emphasis]` |
+| Fish Audio S1 | yes | no | no | no | yes | `(happy)` |
+| Orpheus TTS | no | no | no | no | yes | `<laugh>` |
+| OpenAI gpt-4o-mini-tts | yes | yes | no | yes | yes | bracketed direction, plus an `instructions` line |
+| OpenAI tts-1 and tts-1-hd | no | request speed | no | no | no | annotations removed |
+| Azure AI Speech, Amazon Polly | no | yes | yes | yes | no | SSML `<prosody>` and `<break>` |
+| Kokoro, Google Cloud TTS and every other model | no | no | no | no | no | annotations removed |
+
+Anything a model cannot take is removed from the text: never spoken, and never sent as a tag it would ignore or misread. `[pause]`,
+`[short pause]` and `[long pause]` are a real silence on every model (a `<break>` in SSML, otherwise a pause between the sentences of a
+read). Brackets that are not an annotation (`[1]`, `[Section 4]`, `[[el]]` markers, catalogue lines such as `[punctuation="*"]`) stay
+text and are read as written.
+
+The word highlight follows the person's text, not the wire text: the layer returns offset maps both ways, so a tag removed or inserted on
+the server never shifts the highlight, and an emphasised `**word**` is underlined on screen while the model gets the stress in its own form.
 
 ## Dictation
 
@@ -369,6 +413,16 @@ Click the microphone to start and stop, or hold it and release to send (`dictati
 
 Change or clear them in Settings > Voice (`shortcuts.*`). Keys are matched by their physical position, so a Greek or Italian layout keeps them. The DSH composer uses Alt or Shift with the arrow keys, Enter combinations and Ctrl+O, and DSH owns bare Escape; the defaults avoid all of them. Every control is a labelled button, toggles report their state, and status lines are announced politely to screen readers.
 
+## Speech tools for the assistant
+
+Four model-facing tools let the assistant speak for you instead of only for the page (full reference: [docs/TOOLS.md](docs/TOOLS.md)):
+
+- **`voice_annotations`**: how a text will be spoken by a model, and optionally the text wrapped ready to speak with a tone.
+- **`voice_speak`**: text to mp3. Long passages become numbered clips (`name-01.mp3`, `name-02.mp3`, ...) for engines that synthesise a whole utterance per call, so the first sentence plays without waiting for the last.
+- **`voice_announce`** and **`voice_announce_stop`**: say something out loud now, and stop it.
+
+They use the same providers, voices and annotation layer as the readers. Clips land in `tools.clipDir` (default `~/reports/voice-clips`), written `0600` and only inside your home directory; a path outside it is refused. The settings live in the row config under `tools:` so they appear in Settings like every other value. A host without a tools service still gets working speech, with nothing registered.
+
 ## Settings
 
 Settings > Voice edits everything through `GET/PATCH /api/voice/settings` (the read redacts secrets; the write needs a short-lived capability token, the harness session cookie and a same-origin request). Where the values live depends on the DSH line (`lib/dual-settings.js`, shared with the other plugins of the 0.2 migration): on 0.1.5 the namespace `dsh-voice` of DSH Settings; on 0.2.x this plugin's row in the profile configuration, through the exported `Config` whose top-level keys are all live, with a one-time import of an old `dsh-voice:` section; without a settings service, the plugin settings file (`$DSH_VOICE_DATA_DIR`, default `~/.config/dsh-voice/settings.json`). Keys typed in Settings never land in any of these: they go to `vault.json` (mode 0600) next to it. Behind a reverse proxy, add the public host name to `security.trustedHosts` (on 0.1.5: `dsh-voice: { security: { trustedHosts: [your.host] } }` in `~/.dsh/settings.yaml`).
@@ -378,6 +432,8 @@ A Settings write is also checked for where it sends a key: a cloud provider's ba
 ## HTTP routes
 
 Unchanged from 1.x: `GET /api/voice/config`, `GET /api/voice/quota`, `POST /api/voice/tts`, `POST /api/voice/stt`, `POST /api/voice/polish`. New: `GET /api/voice/session`, `GET|PATCH /api/voice/settings`, `POST /api/voice/test`, `GET /api/voice/voices`, `GET /api/voice/models`, `GET /api/voice/doctor` (read-only self-check, same gate as the settings read; probes only loopback and self-hosted engines with a 2 s GET), `POST /api/voice/detect` (segments with language, source and confidence; the model pass included), and `POST /api/voice/tts?alignment=1` (JSON with base64 audio and word timings where the provider has them).
+
+`POST /api/voice/tts` also takes `saveTo`: with a path inside your home directory it writes the clip (`0600`) and answers with JSON naming it, instead of streaming the audio, and a path outside the home is refused with `VOICE_BAD_REQUEST`. That is how the speech tools leave an mp3 behind.
 
 The 1.x routes stay open to same-origin callers (other plugins such as a notes plugin call `/stt` and `/polish`) but refuse a browser request from another site (`Sec-Fetch-Site: cross-site` or a foreign `Origin`), so a third-party page cannot spend credits. Rate limits per minute (`security.rateLimit`): `ttsPerMin` 60, `sttPerMin` 30, `detectPerMin` 60, `polishPerMin` 30.
 
@@ -406,39 +462,25 @@ npm run build        # src/client -> lib/client.js, verified before it is writte
 npm test             # node --test
 npm run check        # bundle and provider docs up to date + tests
 npm run docs         # regenerate the provider table, setup notes and docs/PROVIDERS.md
-PRIVACY_TERMS="host.example,name" npm run privacy -- --all   # your private terms, home paths, IPs, key shapes, dashes
+npm run privacy -- --all   # private hosts, names, paths, IPs, key shapes, dashes
 ```
 
 `lib/client.js` is generated: edit `src/client/` and rebuild. The host half uses Node built-ins only.
 
 Kill switch: add `- id: voice` with `disabled: true` to the web profile's `cordis.patch.yml` and restart dsh-web.
 
-Note: the unscoped name `dsh-voice` on npm belongs to another project; install from GitHub as above.
+## Publishing
 
+The planned npm name is `@jobopportunitiesapi/dsh-voice` (the unscoped `dsh-voice` is taken on npm). The package in this tree stays named `dsh-voice` because the web profile loads it by that name; a published build is made from a scoped copy of this tree (`npm pkg set name=@jobopportunitiesapi/dsh-voice` on the copy, then `npm publish --access public`), after the privacy check (`npm run privacy -- --all`, also run by the test suite) is clean and the git history to publish is squashed. Nothing is published or pushed from the development tree.
 
+History and measurements of 1.x: `docs/HISTORY-1.x.md`.
 
 License: MIT (see [LICENSE](LICENSE)).
 
 ---
 
-## More plugins by the same author
-
-All of them are open source and run on DeepSeek Harness 0.2.x (several on 0.1.5 too).
-
-| Plugin | What it does |
-|:---|:---|
-| [dsh-artifacts](https://github.com/lucagiftzek/dsh-artifacts) | An Artifacts tab that lists the files an agent produced and previews them in place, plus a template library agents can use and extend |
-| [dsh-mail](https://github.com/lucagiftzek/dsh-mail) | Mail client and agent mail tools: IMAP, POP3, SMTP and OAuth2 accounts, scheduled and bulk sends with unsubscribe handling |
-| [dsh-note-keeper](https://github.com/lucagiftzek/dsh-note-keeper) | Obsidian-compatible Markdown notes in the sidebar with search, graph, audio notes and transcription, OCR and client-side encryption |
-| [dsh-phone](https://github.com/lucagiftzek/dsh-phone) | SMS and calls (Twilio, SIP via Asterisk) with call audio through your own server, live voicemail and Telegram |
-| [dsh-voice](https://github.com/lucagiftzek/dsh-voice) (this one) | Read-aloud, dictation and language-aware speech with 23 TTS and STT providers, per-language routing and word highlighting |
-| [dsh-orchestrator](https://github.com/lucagiftzek/dsh-orchestrator) | Agent swarm and task orchestration: an Orchestrate tab, `orch_*` tools, runners, provider cards and a machine API |
-| [dsh-workspace-rail](https://github.com/lucagiftzek/dsh-workspace-rail) | A workspace-first sidebar rail: pinned chats, projects as folders, live Recents, search and unread markers |
-| [DSH-Idle-Watchdog](https://github.com/lucagiftzek/DSH-Idle-Watchdog) | Idle-chat nudges and an authenticated HTTP API that posts a prompt into any chat |
-| [dsh-plugin-updates](https://github.com/lucagiftzek/dsh-plugin-updates) | Update checker that only offers releases your running DSH core can load |
-| [dsh-subagent-tiering](https://github.com/lucagiftzek/dsh-subagent-tiering) | Subagents default to a cheaper sibling of the parent model unless the agent names a route |
-| [dsh-fs-reobserve](https://github.com/lucagiftzek/dsh-fs-reobserve) | Ends self-inflicted stale-file errors after an agent's own shell commands |
-| [dsh-request-image-cap](https://github.com/lucagiftzek/dsh-request-image-cap) | Clamps every image sent to the model to a pixel cap, fixing many-image request errors |
-| [dsh-seal](https://github.com/lucagiftzek/dsh-seal) | An encrypted channel in front of DSH: a Go reverse proxy plus a service worker that seal all DSH browser traffic |
-
 Built by Luca Tzekos, who also makes [**Job Opportunities API**](https://jobopportunitiesapi.org): employer-direct job data with per-field provenance you can verify yourself, free to read and available as an API. If this plugin is useful to you, a star on this repo or a look at [jobopportunitiesapi.org](https://jobopportunitiesapi.org) is the best thanks.
+
+## Contributing and security
+
+Bugs and ideas: open an issue with the template in `.github/ISSUE_TEMPLATE/`. Pull requests: one change each, with `npm install && npm test` passing. Private reports for security problems follow [SECURITY.md](SECURITY.md), never a public issue. The full ground rules are in [CONTRIBUTING.md](CONTRIBUTING.md).

@@ -22,8 +22,9 @@ import { estimateWordTimings, positionAt, wordAtChar, sentenceSpans, sentenceAt,
 import { createHighlighter } from './highlight.js'
 import { planJobs, playJobs, stopAll, chunkPlan, speakBrowserSegments, pause, resume, isPaused, currentAudio, currentJob, fetchSpeechBytes } from './player.js'
 import { joinParts, webAudioDecoder } from './export.js'
-import { takesTags, carryTags } from './tags.js'
+import { takesTags } from './tags.js'
 import { autoFor, directionEngine, readPref, FALLBACK_KEY, MODEL_KEY, localPick, loadQuota, refreshConfig } from './store.js'
+import { applyAnnotations, adaptationFor, ADAPTATION as ADAPTATIONS } from '../../lib/shared/annotations.js'
 
 // ---------------------------------------------------------------- now playing
 const IDLE = { messageId: null, state: 'idle', why: '', lang: '', langSource: '', auto: false, queued: 0, engine: '' }
@@ -104,6 +105,9 @@ function engineAlignment(cfg, id) {
  */
 export function jobsFor(item, segs, mode) {
   const cfg = item.cfg
+  // the highlight follows the text on screen: for every segment, the chunk it will look for and where that
+  // chunk sits in the message (the prose map of the Markdown, the map of the annotation layer, or both)
+  if (!item.chunkOf) item.chunkOf = (seg, chunkText) => (item.proseMap ? mapChunk(item, seg, chunkText) : segmentChunk(item, seg, chunkText))
   const engine = item.engine || 'auto'
   const picked = directionEngine(engine, cfg, 'tts')
   const ttsModel = localPick(cfg, engine, readPref(MODEL_KEY, 'auto'), 'tts')
@@ -137,7 +141,10 @@ function showPos(hl, mode, pos) {
   hl.show(pos.sentence, mode === 'word' ? pos.word : null)
 }
 
-/** The voice name set for a language in Settings > Voice (perLanguage.<lang>.tts.voice, then '*'); '' when none. */
+/**
+ * The voice name set for a language in Settings > Voice (perLanguage.<lang>.tts.voice, then '*'); '' when none.
+ * Ported from the published 2.0.1, where the browser voice honours a configured name.
+ */
 export function browserVoiceName(cfg, lang) {
   const per = (cfg && cfg.perLanguage) || {}
   const l = String(lang || '').toLowerCase().slice(0, 2)
@@ -145,9 +152,9 @@ export function browserVoiceName(cfg, lang) {
   return e && typeof e.voice === 'string' ? e.voice.trim() : ''
 }
 
-function browserHooks(a, mode, cfg) {
+function browserHooks(a, mode) {
   return {
-    voiceFor: (seg) => browserVoiceName(cfg, seg.lang),
+    voiceFor: (seg) => browserVoiceName(a && a.cfg, seg.lang),
     forSegment: (seg) => ({
       onBoundary: (ci) => {
         if (!a.hl) return
@@ -164,7 +171,7 @@ async function start(item) {
   if (active && active.hl) active.hl.clear()
   const cfg = item.cfg
   const mode = hlMode(cfg)
-  const a = { item, hl: null, chunk: null }
+  const a = { item, hl: null, chunk: null, cfg }
   active = a
   setNow({ messageId: item.messageId, state: 'working', why: '', lang: '', langSource: '', auto: Boolean(item.auto), queued: queue.length, engine: item.engine })
   const built = await segmentsFor(item.md, cfg, { code: item.code })
@@ -176,7 +183,7 @@ async function start(item) {
   const engine = item.engine || 'auto'
   if (engine === 'browser') {
     setNow({ state: 'speaking', lang: segs[0].lang, langSource: segs[0].source })
-    if (!speakBrowserSegments(segs, () => finish(a), browserHooks(a, mode, item.cfg))) finish(a)
+    if (!speakBrowserSegments(segs, () => finish(a), browserHooks(a, mode))) finish(a)
     return
   }
   const jobs = jobsFor(item, segs, mode)
@@ -189,7 +196,7 @@ async function start(item) {
         a.chunk = chunkState(job)
         job.state = a.chunk
         if (audio && audio._words && audio._words.length) a.chunk.words = audio._words
-        if (a.hl) { a.hl.startChunk(job.text); showPos(a.hl, mode, positionAt(a.chunk, 0)) }
+        if (a.hl) { a.hl.startChunk(job.text, { look: job.look, startAt: job.startAt }); showPos(a.hl, mode, positionAt(a.chunk, 0)) }
       },
       onTick: (job, t, audio) => {
         if (active !== a || !a.chunk) return
@@ -210,7 +217,7 @@ async function start(item) {
     // A vendor outage must not mean silence, but it must not SOUND like the
     // chosen engine either: the browser voice takes over only when allowed,
     // and the row says which voice is speaking and why.
-    if (readPref(FALLBACK_KEY, '1') !== '0' && speakBrowserSegments(segs, () => finish(a), browserHooks(a, mode, item.cfg))) {
+    if (readPref(FALLBACK_KEY, '1') !== '0' && speakBrowserSegments(segs, () => finish(a), browserHooks(a, mode))) {
       setNow({ state: 'fallback', why: reason })
       if (/quota|credit/i.test(reason)) refreshConfig()
       return
