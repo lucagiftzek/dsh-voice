@@ -28,7 +28,7 @@ Read-aloud, dictation and language-aware speech for the DeepSeek Harness (DSH) w
 
 - A **TTS Reader** sidebar tab, push-to-talk **dictation** at the composer cursor, and **keyboard shortcuts**.
 
-Status: 2.0.0. 23 provider types, EU vendors first; see [CHANGELOG.md](CHANGELOG.md). Runs on DSH 0.2.x (tested on 0.2.1) and DSH 0.1.5.
+Status: **2.0.0 released**, 23 provider types, EU vendors first; see [CHANGELOG.md](CHANGELOG.md). Runs on DSH 0.2.x (tested on 0.2.1) and DSH 0.1.5. The next release is built and tested on the branch `release/squash`: [what changes in 2.1.0](docs/NEXT-RELEASE.md).
 
 ## Install
 
