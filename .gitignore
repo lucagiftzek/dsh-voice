@@ -9,3 +9,6 @@ node_modules/
 *.orig
 *.rej
 .tmp/
+
+# The next-release preview page lives on its own branch only
+docs/NEXT-RELEASE.md
