@@ -22,9 +22,15 @@ export const RATES = ['0.75', '1', '1.25', '1.5', '1.75', '2', '3']
  * lfm3 behaved on 2026-10-29). Instances added in Settings are accepted when
  * /config lists them. ElevenLabs is selectable again in 2.0 (never in auto).
  */
-export const MENU_ENGINES = ['auto', 'mimo', 'mistral', 'elevenlabs', 'lfm3', 'local', 'grey', 'browser']
+// The voice menus keep the Kokoro engine ('grey', on the remote box); the Tzekos engine ('local') and
+// Liquid ('lfm3') are no longer offered (Luca, 2026-11-25). A saved pick of either keeps working.
+export const MENU_ENGINES = ['auto', 'mimo', 'mistral', 'elevenlabs', 'grey', 'browser']
+/** Engines whose saved pick is honoured but which the menus do not offer. */
+export const HIDDEN_ENGINES = ['local', 'lfm3']
 export function cleanEngine(e, cfg) {
   if (MENU_ENGINES.indexOf(e) >= 0) return e
+  // a pick that is no longer offered stays usable until the person changes it
+  if (HIDDEN_ENGINES.indexOf(e) >= 0) return e
   if (cfg && Array.isArray(cfg.providers) && cfg.providers.some((p) => p.id === e && p.enabled)) return e
   return 'auto'
 }
@@ -167,14 +173,14 @@ export function elevenVoiceName(cfg, picked) {
   return voiceShort(findVoice(cfg, picked) || findVoice(cfg, el.defaultVoice))
 }
 
-/** The local box names its own models (its /health); this only prettifies. */
+/** The local box names its own models (tzekos /health); this only prettifies. */
 export const LM_LABELS = {
   maya: 'Maya1 3B \u00b7 expressive', kokoro: 'Kokoro 82M \u00b7 fast', qwen: 'Qwen3 1.7B \u00b7 inert here',
   base: 'whisper base \u00b7 snappy', 'base.en': 'whisper base.en \u00b7 English-only',
   small: 'whisper small', medium: 'whisper medium \u00b7 best, slowest',
 }
 
-/** The local model pick, only when valid for THIS direction (lists come from the local server via /config). */
+/** The local model pick, only when valid for THIS direction (lists come from tzekos via /config). */
 export function localPick(cfg, engine, sel, dir) {
   if (engine !== 'local' || !sel || sel === 'auto') return ''
   const mo = (((cfg || {}).engines || {}).local || {}).models

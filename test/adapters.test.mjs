@@ -16,6 +16,42 @@ const field = (req, name) => {
   return m ? m[1] : null
 }
 
+test('Supertonic speaks the same wire shape as Kokoro and sends the language code it documents', async () => {
+  const mod = await import('../lib/server/providers/supertonic.js')
+  const a = mod.default
+  // the ten voices, and 31 languages with Greek among them
+  assert.equal((await a.listVoices({ options: {} })).length, 10)
+  const caps = a.capabilities({ options: {} })
+  assert.equal(caps.ttsLangs.includes('el'), true, 'Greek is the reason this engine exists here')
+  assert.equal(caps.ttsLangs.includes('it'), true)
+  assert.equal(caps.detectsLanguage, true)
+  // a regional tag is cut to its base; an unknown one becomes na so the model decides
+  assert.equal(mod.supertonicLang('en-GB'), 'en')
+  assert.equal(mod.supertonicLang('it-IT'), 'it')
+  assert.equal(mod.supertonicLang('xx'), 'na')
+  assert.equal(mod.supertonicLang(''), 'na')
+  assert.equal(mod.supertonicLang('na'), 'na')
+  // a base URL alone is not a usable instance: the service requires its key
+  assert.equal(a.configured({ baseUrl: 'http://127.0.0.1:8791', secret: () => '' }), false)
+  assert.equal(a.configured({ baseUrl: 'http://127.0.0.1:8791', secret: () => 'k' }), true)
+})
+
+test('Kokoro serves the 54 voices of its pack, in nine languages, and never Greek', async () => {
+  const { TYPES } = await import('../lib/server/registry.js')
+  const a = TYPES['tzekos-native']
+  const inst = { id: 'grey', type: 'tzekos-native', baseUrl: 'http://127.0.0.1:9', options: {}, secret: () => '' }
+  const voices = await a.listVoices(inst)
+  assert.equal(voices.length, 54, 'the pack has 54 voices; a short list is the defect this test exists for')
+  const byLang = {}
+  for (const v of voices) { const l = v.langs[0]; byLang[l] = (byLang[l] || []).concat(v.id) }
+  assert.deepEqual(Object.keys(byLang).sort(), ['en', 'es', 'fr', 'hi', 'it', 'ja', 'pt', 'zh'])
+  assert.deepEqual(byLang.it, ['if_sara', 'im_nicola'])
+  assert.equal(byLang.en.length, 28, '20 American and 8 British')
+  const caps = a.capabilities(inst)
+  assert.deepEqual(caps.ttsLangs.slice().sort(), ['en', 'es', 'fr', 'hi', 'it', 'ja', 'pt', 'zh'])
+  assert.equal(caps.ttsLangs.includes('el'), false, 'no Kokoro voice speaks Greek')
+})
+
 test('mistral: tts request shape and decoded audio', async () => {
   const m = await mockServer((r, res) => reply(res, 200, { audio_data: AUDIO.toString('base64') }))
   try {
@@ -200,7 +236,7 @@ test('elevenlabs: account(), refreshQuota(), isDry()', async () => {
   } finally { await m.close() }
 })
 
-test('elevenlabs-compatible native (local server preset): tts JSON on /api/tts', async () => {
+test('elevenlabs-compatible native (Tzekos): tts JSON on /api/tts', async () => {
   const m = await mockServer((r, res) => reply(res, 200, AUDIO, { 'content-type': 'audio/mpeg' }))
   try {
     const i = inst({ baseUrl: m.origin, key: 'fake-tts-key', defaultVoice: 'founder', options: { native: true } })

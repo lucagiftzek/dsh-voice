@@ -95,11 +95,14 @@ test('1.x POST routes refuse cross-site browser requests, same-origin and header
 })
 
 test('polish is rate limited (security.rateLimit.polishPerMin)', async () => {
-  const v = await voiceServer({}, { config: { security: { rateLimit: { polishPerMin: 2 } } } })
+  // The limiter runs before any model is called. A closed local port makes each of the first two calls fail
+  // in milliseconds instead of waiting on whichever polish model the host happens to offer, so the test
+  // measures the limiter alone and stays fast on every install.
+  const v = await voiceServer({ DSH_VOICE_OLLAMA_PORT: '9', DSH_VOICE_POLISH_MODEL: 'unused' }, { config: { security: { rateLimit: { polishPerMin: 2 } } } })
   try {
     const go = () => v.call('POST', '/polish', { body: { text: 'hello' } })
     assert.equal((await go()).status, 200)
     assert.equal((await go()).status, 200)
     assert.equal((await go()).status, 429)
   } finally { await v.close() }
-})
+}, { timeout: 60000 })

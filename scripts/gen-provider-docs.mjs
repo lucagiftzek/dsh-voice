@@ -31,6 +31,7 @@ const PRICE = {
   google: 'check the vendor pricing page (Neural2 and Chirp 3 HD differ)',
   amazon: 'Polly neural about $16 per 1M characters; Transcribe per second',
   openai: 'per character (TTS) and per minute (STT), see the pricing page',
+  openrouter: 'set by the vendor of each model (a few models have a free :free variant)',
   'openai-compatible': 'depends on the server (free when self-hosted)',
   fish: 'check the vendor pricing page',
   cartesia: 'check the vendor pricing page',
@@ -40,6 +41,7 @@ const PRICE = {
   dashscope: 'per character',
   'elevenlabs-compatible': 'free (your server)',
   'tzekos-native': 'free (your server)',
+  supertonic: 'free (your server)',
   lfm3: 'free (local)',
   piper: 'free (local)',
   xtts: 'free (local, non-commercial licence)',
@@ -47,6 +49,7 @@ const PRICE = {
 }
 
 const SETUP = {
+  supertonic: 'Run the resident service on the speech machine (Supertonic 3 weights, port 8791), then set `SUPERTONIC_TTS_URL` and `SUPERTONIC_API_KEY` in the environment, or add an instance with `baseUrl` in Settings. Voice styles M1-M5 and F1-F5 each work in all 31 languages; `language` is passed per request and an unknown tag becomes `na` so the model decides.',
   mistral: 'Credential: the API key (`env:MISTRAL_API_KEY`). Use the `mistral-eu` preset for EU-only inference. Greek has no preset voice: pick `voxtral-mini-tts-3-0` and a cloned or Italian-capable voice only after listening.',
   speechmatics: 'Credential: the API key. Region `eu1` (default) or `eu2`; keep it on an EU region. Speech to text only through the batch API; the English TTS preview is optional.',
   gladia: 'Credential: the API key (sent as `x-gladia-key`). Greek is transcribed with `solaria-1`; the adapter picks it for you.',
@@ -57,6 +60,7 @@ const SETUP = {
   google: 'Credential: a Cloud API key (or an OAuth bearer token starting `ya29.`). Region `eu` (default) uses the EU endpoints. Word timings need a non-Chirp voice (for example Neural2).',
   amazon: 'Credential: one string `ACCESSKEYID:SECRET` (add `:SESSIONTOKEN` for temporary credentials), for an IAM user allowed `polly:SynthesizeSpeech`, `polly:DescribeVoices` and `transcribe:StartStreamTranscriptionWebSocket`. Pick an EU region. Polly has no Greek voice.',
   openai: 'Credential: the API key. The `openai-eu` preset needs an EU data-residency project with approval from OpenAI. The TTS models retire on 2027-01-06 and whisper-1 plus the gpt-4o transcribe family on 2027-02-26.',
+  openrouter: 'Credential: the OpenRouter API key. A voice belongs to one model, so pick the model and its voice together (the reader menus list the voices of the chosen model). The vendor of the model sets the residency and the price: option `preferProviders` pins an endpoint such as `mistral/eu`, `onlyProviders` limits the endpoints, `zdr` routes only to endpoints that keep no logs. The speech catalogue is read live, so a model added on OpenRouter appears without a plugin change.',
   'openai-compatible': 'Credential: the key the server expects (leave empty and tick `keyless` for a local server). Presets fill in the base URL: Kokoro-FastAPI (word timings through its captioned speech route, no Greek), Speaches, LocalAI, openedai-speech, Groq (speech to text), OVHcloud AI Endpoints.',
   fish: 'Credential: the API key. A new account has no credit: use the free model `s2.1-pro-free`. Greek is not advertised by the vendor.',
   cartesia: 'Credential: the API key. Word timings use the TTS WebSocket (option `wordTimestamps`), otherwise plain audio.',
@@ -64,7 +68,7 @@ const SETUP = {
   assemblyai: 'Credential: the API key. Use the EU preset for `api.eu.assemblyai.com`. Greek is transcribed with Universal-2 only.',
   mimo: 'Credential: the Token Plan key (`env:MIMO_TOKEN_PLAN_API_KEY`); the base URL may be `http://host:port` for a relay.',
   dashscope: 'Legacy, off unless `legacy.engines` is on.',
-  'elevenlabs-compatible': 'Credential: the server key. The Local TTS server preset points at a loopback server (`http://127.0.0.1:8771`).',
+  'elevenlabs-compatible': 'Credential: the server key. The Tzekos preset points at a loopback server (`http://127.0.0.1:8771`).',
   'tzekos-native': 'Credential: the server key. Only `POST /api/tts` is ever called.',
   lfm3: 'No credential. Loopback llama.cpp router; shares the GPU, so it is only used as an explicit fallback.',
   piper: 'No credential needed. Start the Piper HTTP server (`python3 -m piper.http_server`) and point the base URL at it (default port 5000).',

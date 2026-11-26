@@ -10,7 +10,7 @@ import { runInNewContext } from 'node:vm'
 import http from 'node:http'
 import { createDictation, insertAt, caretToDraftOffset, nextDictationLang, levelOf, HOLD_MS } from '../src/client/dictation.js'
 import { parseCombo, matches, actionFor, conflicts, installShortcuts, DEFAULT_SHORTCUTS } from '../src/client/shortcuts.js'
-import { stripTags, carryTags, insertMarker, insertSnippet, fileText, takesTags } from '../src/client/tags.js'
+import { stripTags, insertMarker, insertSnippet, fileText, takesTags, tagsFor } from '../src/client/tags.js'
 import { loadClientBundle } from '../scripts/build.mjs'
 import { polish, POLISH_SYSTEM, polishConfig } from '../lib/server/polish.js'
 import { createSettingsStore } from '../lib/server/settings-store.js'
@@ -130,13 +130,14 @@ test('installShortcuts: down and up handlers, repeat ignored, preventDefault, un
 })
 
 // ---------------------------------------------------------------- tags and markers helper
-test('Voxtral tags: only Mistral TTS 3 gets them, carried across chunks', () => {
-  assert.equal(stripTags('[emotion=happy] Hello [laugh] there [pace=slow]now'), ' Hello there now')
+test('annotations: the menu follows the model, and stripping removes every annotation', () => {
+  assert.equal(stripTags('[tone=happy] Hello [laugh] there [pace=slow] now'), 'Hello there now')
   assert.equal(stripTags('keep [[el]] markers and [wiki]'), 'keep [[el]] markers and [wiki]')
-  assert.ok(takesTags('mistral', 'voxtral-mini-tts-3-0'))
-  assert.ok(!takesTags('mistral', ''))
-  assert.ok(!takesTags('elevenlabs', 'voxtral-mini-tts-3-0'))
-  assert.deepEqual(carryTags(['[emotion=sad] a.', 'b.', '[pace=fast] c.', 'd.']), ['[emotion=sad] a.', '[emotion=sad]b.', '[pace=fast] c.', '[emotion=sad][pace=fast]d.'])
+  assert.ok(takesTags('mistral', 'voxtral-mini-tts-3-0'), 'Voxtral TTS 3 takes annotations')
+  assert.ok(!takesTags('mistral', 'voxtral-mini-tts-2603'), 'the older Voxtral documents none')
+  assert.ok(takesTags('openrouter', 'elevenlabs/eleven-v3'), 'a tag model through OpenRouter')
+  assert.ok(takesTags('openrouter', 'hexgrad/kokoro-82m'), 'Kokoro takes the request speed, so its menu shows Pace')
+  assert.ok(!tagsFor('openrouter', 'hexgrad/kokoro-82m').menu.groups.some((g) => /Tone|Pitch|Volume|Sounds/.test(g.group)), 'and nothing else')
 })
 
 test('markers helper: wrap a selection, insert a switch, end marker, snippets', () => {
@@ -178,10 +179,11 @@ function bootClient(ctxExtra) {
 }
 
 test('client boots without the sidebar service (no inject API, or the service never arrives)', () => {
-  assert.deepEqual(bootClient().slots.sort(), ['voice-mic', 'voice-settings', 'voice-speak'])
+  // voice-clips is the player for clips the speech tools produced (conversation.chat.turnTail)
+  assert.deepEqual(bootClient().slots.sort(), ['voice-clips', 'voice-mic', 'voice-settings', 'voice-speak'])
   const waited = []
   const r = bootClient({ inject: (names) => { waited.push(names.join(',')) } })
-  assert.equal(r.slots.length, 3)
+  assert.equal(r.slots.length, 4)
   assert.deepEqual(waited, ['betterSidebar'])
   assert.equal(JSON.stringify(r.mod.inject), '["slots"]', 'betterSidebar is not a required inject')
 })
@@ -195,7 +197,7 @@ test('client registers the TTS Reader tab when the sidebar exists, and survives 
   assert.equal(tabs[0].single, true)
   assert.equal(typeof tabs[0].component, 'function')
   const dup = bootClient({ inject: (names, cb) => cb({ betterSidebar: { registerTab: () => { throw new Error('tab type "dsh-tts-reader:main" already registered') } }, on() {} }) })
-  assert.equal(dup.slots.length, 3)
+  assert.equal(dup.slots.length, 4)
 })
 
 // ---------------------------------------------------------------- polish via ctx.llm

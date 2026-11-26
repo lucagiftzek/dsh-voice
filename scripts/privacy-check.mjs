@@ -6,9 +6,9 @@
  *   node scripts/privacy-check.mjs --all      every tracked + untracked file
  *   node scripts/privacy-check.mjs --range A..B   added lines of a commit range
  *
- * Fails (exit 1) on: the private terms in PRIVACY_TERMS (comma-separated), home paths,
- * private IP ranges, key-shaped strings, and em or en dashes.
- *
+ * Fails (exit 1) on: private hosts (*.tzekos.eu), machine names, home paths,
+ * private IP ranges, key-shaped strings, and em or en dashes. The Tzekos
+ * preset may NAME "Tzekos" as a label with a loopback URL; the bare word is fine.
  * Prints file:line and the rule, never the matched text of a secret.
  */
 import { execFileSync } from 'node:child_process'
@@ -21,10 +21,9 @@ const sh = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', ma
 const EM = String.fromCharCode(0x2014)
 const EN = String.fromCharCode(0x2013)
 const RULES = [
-  // Extra private terms (your host names, people, install owners) come from
-  // the environment, never from this file: PRIVACY_TERMS="alpha.example,bob".
-  ...String(process.env.PRIVACY_TERMS || '').split(',').map((t) => t.trim()).filter(Boolean)
-    .map((t) => ['private term', new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')]),
+  ['private host', /\b[a-z0-9-]+\.tzekos\.eu\b/i],
+  ['machine name', /\b(blackserver|whiteserver|greyserver|silverbook|cyanserver|bluserver|blueserver|afroditi-vm|vps-[0-9a-f]{6,})\b/i],
+  ['person or install name', /\b(afroditi|federico|lucagiftzek)\b/i],
   ['home path', /\/home\/[a-z_][a-z0-9_-]*/i],
   ['private IP', /\b(192\.168\.\d+\.\d+|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)\b/],
   ['key-shaped string', /\b(sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|xi-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{30,}|lm_[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_-]{30,})\b/],

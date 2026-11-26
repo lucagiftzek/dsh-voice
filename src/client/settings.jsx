@@ -413,7 +413,7 @@ function Languages(props) {
         <button type="button" className="p" onClick={save}>Save languages</button>
         <span role="status" aria-live="polite" style={S.hint}>{msg}</span>
       </div>
-      <div style={S.hint}>"auto" keeps the built-in 1.x routing (English: MiMo then Mistral; Greek, Italian and the rest: the local TTS server). Markers in a text (<code>[[el]]</code>, <code>[[it]]...[[/]]</code>, <code>{'<!--lang:el-->'}</code>) override these settings for their span.</div>
+      <div style={S.hint}>"auto" keeps the built-in 1.x routing (English: MiMo then Mistral; Greek, Italian and the rest: the local Tzekos engine). Markers in a text (<code>[[el]]</code>, <code>[[it]]...[[/]]</code>, <code>{'<!--lang:el-->'}</code>) override these settings for their span.</div>
     </div>
   )
 }

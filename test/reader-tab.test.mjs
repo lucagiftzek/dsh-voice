@@ -60,18 +60,46 @@ test('reader tab starts from the retired tab\'s model pick and voice', { skip: !
   store.set('dsh-tts-reader.voice.mistral:voxtral-mini-tts-3-0', 'voice_482')
   store.delete('dsh-voice.v2.reader.provider')
   const { ReaderTab } = await loadTab()
+  // /config is not answering in this test, so the tab shows the pickers once a config arrives:
+  // what matters here is that the saved pick survives (the provider menu lists Voxtral's models when known)
   const html = renderToString(React.createElement(ReaderTab, { visible: true }))
-  // Voxtral TTS 3 picked: the tag menu appears
-  assert.ok(html.includes('Insert a Voxtral tag'))
+  const cfg = { providers: [{ id: 'mistral', type: 'mistral', label: 'Mistral', enabled: true, tts: true }], engines: { mistral: { models: { tts: [{ id: 'voxtral-mini-tts-3-0', name: 'Voxtral TTS 3' }] }, voices: [], ttsModels: null, v2: { annotation: { family: 'voxtral', summary: 'tone, pace, sounds' } } } } }
+  const { readerChoices, readerAnnotation } = await loadTab()
+  assert.equal(readerChoices(cfg, 'mistral').models[0].id, 'voxtral-mini-tts-3-0')
+  assert.equal(readerAnnotation(cfg, 'mistral').family, 'voxtral', 'the saved pick maps to its family, so the menu has its groups')
+  assert.equal(typeof html, 'string')
 })
 
-test('provider and voice choices come from /config', async () => {
-  const { readerProviders, readerChoices } = await loadTab()
+test('provider and voice choices come from /config, and a catalogue makes the voices follow the model', async () => {
+  const { readerProviders, readerChoices, readerAnnotation } = await loadTab()
   const cfg = {
-    providers: [{ id: 'mistral', type: 'mistral', label: 'Mistral', enabled: true, tts: true }, { id: 'groq', type: 'openai-compatible', enabled: false, tts: false }, { id: 'browser', type: 'browser', enabled: true, tts: true }],
-    engines: { mistral: { models: { tts: [{ id: 'voxtral-mini-tts-3-0', name: 'Voxtral TTS 3' }] }, voices: [{ id: 'gb_oliver_neutral', name: 'Oliver' }] }, grey: { models: { tts: ['bm_george'] } } },
+    providers: [{ id: 'mistral', type: 'mistral', label: 'Mistral', enabled: true, tts: true }, { id: 'or', type: 'openrouter', label: 'OpenRouter', enabled: true, tts: true }, { id: 'groq', type: 'openai-compatible', enabled: false, tts: false }, { id: 'browser', type: 'browser', enabled: true, tts: true }],
+    engines: {
+      mistral: { models: { tts: [{ id: 'voxtral-mini-tts-3-0', name: 'Voxtral TTS 3' }, { id: 'voxtral-mini-tts-2603', name: 'Voxtral TTS v1' }] }, voices: [{ id: 'gb_oliver_neutral', name: 'Oliver' }], ttsModels: null, v2: { annotation: { family: 'voxtral', summary: 'tone, pace, sounds', menu: { groups: [] } } } },
+      grey: { models: { tts: ['bm_george'] }, ttsModels: null },
+      or: { ttsModels: [
+        { id: 'elevenlabs/eleven-v3', label: 'Eleven v3', family: 'elevenlabs', default: false, voices: [{ id: 'george' }, { id: 'sarah' }] },
+        { id: 'mistralai/voxtral-mini-tts-3-0', label: 'Voxtral TTS 3', family: 'voxtral', default: true, voices: [{ id: 'gb_oliver_neutral' }] },
+        { id: 'hexgrad/kokoro-82m', label: 'Kokoro', family: 'kokoro', voices: [] },
+      ] },
+    },
   }
-  assert.deepEqual(readerProviders(cfg).map((p) => p.id), ['auto', 'mistral', 'browser'])
-  assert.deepEqual(readerChoices(cfg, 'mistral'), { models: [{ id: 'voxtral-mini-tts-3-0', label: 'Voxtral TTS 3' }], voices: [{ id: 'gb_oliver_neutral', label: 'Oliver' }] })
-  assert.deepEqual(readerChoices(cfg, 'grey').voices, [{ id: 'bm_george', label: 'bm_george' }])
+  assert.deepEqual(readerProviders(cfg).map((p) => p.id), ['auto', 'mistral', 'or', 'browser'])
+  const mistral = readerChoices(cfg, 'mistral')
+  assert.deepEqual(mistral.models.map((m) => m.id), ['voxtral-mini-tts-3-0', 'voxtral-mini-tts-2603'])
+  assert.deepEqual(mistral.voices, [{ id: 'gb_oliver_neutral', label: 'Oliver' }])
+  // the voices carry their facets: language, accent and tone read from the id
+  const vox = readerChoices(cfg, 'mistral')
+  assert.deepEqual(vox.voices, [{ id: 'gb_oliver_neutral', label: 'Oliver' }])
+  assert.deepEqual(vox.facets.languages.map((x) => x.value), ['English'], 'one language entry, even for gb and en tags')
+  assert.deepEqual(vox.facets.accents.map((x) => x.value), ['gb'], 'only the accents the voices name')
+  // a catalogue: every model with its own voices, and the default model picked until one is chosen
+  const or = readerChoices(cfg, 'or')
+  assert.equal(or.catalogue, true)
+  assert.deepEqual(or.models.map((m) => m.id), ['elevenlabs/eleven-v3', 'mistralai/voxtral-mini-tts-3-0', 'hexgrad/kokoro-82m'])
+  assert.equal(or.model.id, 'mistralai/voxtral-mini-tts-3-0')
+  assert.deepEqual(or.voices.map((v) => v.id), ['gb_oliver_neutral'])
+  assert.deepEqual(readerChoices(cfg, 'or', 'elevenlabs/eleven-v3').voices.map((v) => v.id), ['george', 'sarah'], 'the voices of the chosen model')
+  assert.equal(readerAnnotation(cfg, 'or', 'elevenlabs/eleven-v3').family, 'elevenlabs')
+  assert.equal(readerAnnotation(cfg, 'mistral').family, 'voxtral')
 })

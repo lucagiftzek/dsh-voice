@@ -1,27 +1,60 @@
 /**
- * dsh-voice client: Voxtral TTS 3 inline tags (emotion, pace, sounds) and the
- * language-marker helper of the reader tab. Pure; tested in node.
+ * dsh-voice client: the reader tab's helpers for speech annotations and language
+ * markers. Pure; tested in node.
  *
- * Voxtral tags are a provider-specific syntax ([emotion=happy], [pace=slow],
- * [laugh]); they reach Mistral TTS 3 only and are removed for every other
- * engine, which would read them aloud. A tag lasts until the end of its
- * request, so the active emotion and pace are carried into later chunks.
+ * Annotations ([tone=happy], [pace=slow], [laugh]) are written in ONE syntax and
+ * adapted per model ON THE SERVER (lib/shared/annotations.js), which owns the
+ * vocabulary, the per-family rules and the offset maps. The client only needs
+ * to know what the selected model can take (for the menu) and to remove the
+ * annotations a caller strips itself.
  */
+import { tagMenu, adaptationFor, listAnnotations, SYNTAX } from '../../lib/shared/annotations.js'
 
-export const TAGS = [
-  { group: 'Emotion', items: ['amused', 'angry', 'anxious', 'apologetic', 'appreciative', 'assertive', 'bored', 'calm', 'confident', 'confused', 'critical', 'curious', 'determined', 'disappointed', 'disgusted', 'excited', 'frustrated', 'grateful', 'happy', 'hopeful', 'playful', 'proud', 'reflective', 'resigned', 'sad', 'sarcastic', 'skeptical', 'somber', 'surprised', 'tense', 'tired', 'urgent', 'warm', 'wistful'].map((e) => '[emotion=' + e + ']') },
-  { group: 'Pace', items: ['very-slow', 'slow', 'moderate', 'fast', 'very-fast'].map((p) => '[pace=' + p + ']') },
-  { group: 'Sounds', items: ['um', 'uh', 'laugh', 'chuckle', 'laugh hard', 'breath', 'sigh', 'gasp', 'sniff', 'cough', 'throat clearing', 'yawn'].map((x) => '[' + x + ']') },
-]
-const SOUNDS = TAGS[2].items.map((t) => t.slice(1, -1))
-const TAG_RE = new RegExp('\\[(?:(?:emotion|pace)=[a-z-]+|' + SOUNDS.map((s) => s.replace(/ /g, '\\s')).join('|') + ')\\]', 'g')
+export { SYNTAX, listAnnotations }
 
-/** Is this engine/model the one that understands the tags? */
-export const takesTags = (engine, model) => engine === 'mistral' && /tts-3/.test(String(model || ''))
+/** The annotation groups the selected provider/model can take, from its family (cached per key). */
+const menuCache = new Map()
+export function tagsFor(engine, model, family) {
+  // the engine itself decides when no published family is given (the engine IS the provider id there,
+  // which would otherwise resolve the wrong family: "openrouter" is not a model)
+  const key = String(family || '') + '|' + String(engine || '') + '|' + String(model || '')
+  if (!menuCache.has(key)) {
+    let a
+    if (family && family.length > 2) {
+      // the server published the family of this instance (cfg.engines[id].v2.annotation.family)
+      a = adaptationFamily(family)
+    } else {
+      a = adaptationFor(null, model, engine)
+    }
+    menuCache.set(key, { menu: tagMenu(a), family: a.family, label: a.label })
+  }
+  return menuCache.get(key)
+}
+const ADAPTATION_FAMILIES = (familyName) => familyName
+function adaptationFamily(name) {
+  return annotationInfoFor(name)
+}
+import { annotationInfo } from '../../lib/shared/annotations.js'
+import { ADAPTATION } from '../../lib/shared/annotations.js'
+function annotationInfoFor(name) {
+  const a = ADAPTATION[name]
+  if (!a) return { family: 'mute', label: 'No annotations', channels: {}, tags: null, instructions: false, ssml: false }
+  return { family: name, label: a.label, tags: a.tags, instructions: a.instructions, ssml: a.ssml, channels: Object.assign({}, a.channels), verification: a.verification, capsStress: name === 'gemini' || name === 'openai' }
+}
 
-/** Remove Voxtral tags (and the double space they leave). */
+/** Is this engine/model a family that takes native annotations (so the menu is worth showing)? */
+export function takesTags(engine, model, family) {
+  const t = tagsFor(engine, model, family)
+  return t.menu.groups.length > 0
+}
+
+/** Remove every annotation from a text (the words only), for a caller that speaks through a path without the server layer. */
 export function stripTags(text) {
-  return String(text || '').replace(TAG_RE, '').replace(/[ \t]{2,}/g, ' ')
+  const src = String(text || '')
+  // remove from the END: every offset then still refers to the original string
+  let out = src
+  for (const a of listAnnotations(src).reverse()) out = out.slice(0, a.from) + out.slice(a.to)
+  return out.replace(/[ \t]{2,}/g, ' ').replace(/^ /, '')
 }
 
 /** Carry the active emotion and pace into chunks that do not start with their own. */

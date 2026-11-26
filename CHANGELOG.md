@@ -1,26 +1,42 @@
 # Changelog
 
-## 2.0.1 (2026-11-25)
-
-### Fixed
-- **The browser voice no longer drops the natural voices on Windows.** `localVoice()` only accepted voices with `localService === true`, but the natural neural voices of Edge and Windows (Xiaoxiao, Yunxi, Aria and so on) are cloud voices, so only the mechanical offline set (Huihui, Kangkang) could ever be chosen (issue #1, thanks @AYYYRA). Now a cloud voice whose name says Natural or Neural is a candidate and is preferred within the language (exact tag, then primary subtag); the on-device voice stays the fallback. Ordinary online voices such as Chrome's "Google ..." ones are still never picked, because they send the text to Google.
-- **`perLanguage.<lang>.tts.voice` is honoured by the browser voice.** A voice name (exact, or a part of the name, case-insensitive) picks that voice when the device has it, even a cloud one; an unknown name is ignored.
-
-## 2.0.0 (2026-11-02)
-
-First public release (squashed history).
-
-### Changed
-- Public tree: user-visible labels of the loopback server preset and the native Kokoro provider are generic ("Local TTS server", "Kokoro (native /api/tts)"); the type and preset ids are unchanged, so saved settings keep working. The native preset falls back to the voice `default`.
-- `scripts/privacy-check.mjs` takes private terms from `PRIVACY_TERMS` instead of a built-in list.
-
+## Unreleased
 
 ### Added
+- Provider type `supertonic`: Supertonic 3 on the resident Rust service, the second self-hosted engine beside Kokoro. Ten voice styles over 31 languages including Greek, which Kokoro does not speak. Discovered from `SUPERTONIC_TTS_URL`, never in automatic routing. Same wire shape as Kokoro (`POST /api/tts`, `xi-api-key`, WAV), so it needs no credential beyond the service key.
+- The annotation layer maps the `supertonic` type explicitly: the model documents no tag vocabulary, so markers are stripped rather than risked, and a future documented tag set has one place to change.
+- **Speech tools for the assistant**: `voice_annotations` (how a text will be spoken, and the text wrapped for a tone), `voice_speak` (text to mp3; a long passage becomes numbered sentence clips so the first sentence plays without waiting for the last), `voice_announce` and `voice_announce_stop`. Written to the DSH tool contract: a canonical value validated against the output schema, content blocks for the model, and a presentation projection carrying clip paths to a UI without showing them to the model. Reference: `docs/TOOLS.md`.
+- `POST /api/voice/tts` takes `saveTo`: the clip is written inside the home directory at mode 0600 and named in the reply, and a path outside the home is refused. This is how a tool leaves an mp3 behind.
+- `tools.provider`, `tools.voice`, `tools.model`, `tools.language`, `tools.clipDir` and `tools.chunkChars` in the configuration, so every value the tools use is visible in Settings and none is hardcoded.
+- The speech tools register only when the host provides a tools service; without one the plugin serves speech exactly as before and logs `tools skipped`.
 - Docs and diagnostics standard: `docs/TROUBLESHOOTING.md`, `docs/ERRORS.md` (stable `VOICE_*` codes), the bundled `voice-doctor` skill and a README section "When something goes wrong".
 - Every HTTP error body now has the shape `{ ok: false, error, code, message, hint, docs }`. Statuses and the `error` strings are unchanged. A body that carried a short lower-case `code` (`rate_limited`, `browser_only`, `cross_site`, or a vendor code such as `bad_key`) now carries it as `legacyCode`, because `code` is the `VOICE_*` code; the `x-voice-error-code` header is unchanged.
 - Log lines of failed routes start with the code.
 - `GET /api/voice/doctor`: read-only self-check (settings mode, Config, providers, routing, trusted hosts, data directory and secret file modes, self-hosted engine reachability with a 2 s GET, retirements, client bundle). No secrets in the output, no paid call.
 - The `voice-doctor` skill is registered with the harness skill registry at start (`ctx.inject(['skills'])`).
+
+## 2.1.0
+
+Speech annotations, the OpenRouter provider, and the reader's model catalogue.
+
+### Added
+- **Speech annotations**: one syntax for the person writing (`[tone=happy]`, `[pace=slow]`, `[pitch=high]`, `[volume=soft]`, `[emphasis]`, `**word**`, `[laugh]`, `[pause]`, `[slightly sad]`) adapted per model family in `lib/shared/annotations.js`. Each family's rules were read from its vendor documentation on 2026-11-25 and the source is quoted in the entry's `verification` note: Voxtral TTS 3 (`[emotion=]`, `[pace=]`, disfluency tags), ElevenLabs v3 and v4 (`[tag]`), Gemini 3.8 TTS (angle tags plus `speech_metadata.style`), HeyGen Voice (one tag per position, `slightly`/`extremely` only), Fish Audio S2 and Drama 3 (free text cues, `[emphasis]`), Fish Audio S1 (parentheses), Orpheus (sound tags only), OpenAI gpt-4o-mini-tts (bracketed direction plus `instructions`, measured live), Azure AI Speech and Amazon Polly (SSML `<prosody>` and `<break>`).
+- Anything a model cannot take is removed, never spoken. A pause becomes a real silence on every model. Brackets that are not annotations (`[1]`, `[Section 4]`, `[[el]]`, catalogue lines such as `[punctuation="*"]`) stay text.
+- Offset maps in both directions (`map`, `unmap`, `toWire`), so the word highlight follows the text on screen through removed tags, Markdown headings and bold markers. `buildSegments` now returns `map` (prose offset -> text offset) and each segment its `start`.
+- Provider type `openrouter`: `POST /v1/audio/speech` and `/v1/audio/transcriptions` over one key for 40+ vendors' models, with the live catalogue (`GET /v1/audio/speech/models`) that publishes each model's voices, formats, speed range and instruction support. PCM-only models are wrapped into a WAV at the rate the response header names. Options pin provider routing (`preferProviders`, `onlyProviders`, `zdr`) to slugs that actually serve the chosen model.
+- `GET /api/voice/annotations?provider&model&text`: every annotation of a text, how many of them the selected model can take, its menu and the delivery instruction it would receive.
+- `/config` publishes `engines[id].ttsModels` (each model with its own voices and its annotation family) and `engines[id].v2.annotation` (family, summary, menu, syntax) for every provider.
+- `GET /api/voice/voices?provider&model`: the voices of one model where a provider has a catalogue.
+- The TTS Reader and the chat reader list every provider's models, and the voices follow the chosen model; the annotation menu offers only what that model can take.
+
+### Changed
+- Every speech adapter sends the text the annotation layer returns for its model (Mistral, ElevenLabs, Azure, Amazon, Google, OpenAI, OpenAI-compatible, OpenRouter, Fish, Cartesia, MiMo, DashScope, tzekos-native, LFM3).
+- An engine lists its models even when it cannot speak right now, so the menus show what a provider would offer.
+- `openai` voices are listed per model (13 for gpt-4o-mini-tts, 9 for tts-1 and tts-1-hd), and gpt-4o-mini-tts records a delivery instruction when the caller passes one.
+
+### Fixed
+- The polish rate-limit test no longer waits on whichever local model the host offers (it points at a closed port).
+- `speakableProseMapped` aligns the prose against the source text, so a heading or an escaped entity never shifts a mapped offset.
 
 ## 2.0.0-rc.2
 

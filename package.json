@@ -1,7 +1,8 @@
 {
-  "name": "@lucagiftzek/dsh-voice",
-  "version": "2.0.1",
-  "description": "Read-aloud, dictation and language-aware speech for the DeepSeek Harness web UI: many TTS/STT providers at once (EU vendors first: Mistral, Speechmatics, Gladia, ReadSpeaker; plus ElevenLabs, Azure, Google, Amazon, OpenAI and OpenAI-compatible servers, Deepgram, Cartesia, AssemblyAI, Fish, self-hosted Piper/XTTS/Kokoro, the browser voice), per-language routing, in-text language markers and word highlighting.",
+  "name": "dsh-voice",
+  "version": "2.1.0",
+  "description": "Read-aloud, dictation and language-aware speech for the DeepSeek Harness web UI: many TTS/STT providers at once (EU vendors first: Mistral, Speechmatics, Gladia, ReadSpeaker; plus ElevenLabs, Azure, Google, Amazon, OpenAI, OpenRouter and OpenAI-compatible servers, Deepgram, Cartesia, AssemblyAI, Fish, self-hosted Piper/XTTS/Kokoro, the browser voice), per-language routing, in-text language markers, speech annotations (tone, pace, pitch, sounds) adapted to each model, and word highlighting.",
+  "private": true,
   "license": "MIT",
   "type": "module",
   "main": "lib/index.js",
@@ -19,7 +20,12 @@
     "docs/PROVIDERS.md",
     "docs/TROUBLESHOOTING.md",
     "docs/ERRORS.md",
-    "skills"
+    "skills",
+    "docs/TOOLS.md",
+    "docs/HISTORY-1.x.md",
+    "docs/media",
+    "CONTRIBUTING.md",
+    "SECURITY.md"
   ],
   "scripts": {
     "build": "node scripts/build.mjs",
@@ -56,27 +62,7 @@
     "react-dom": "18.3.1"
   },
   "author": {
-    "name": "Luca Tzekos",
+    "name": "Loukas \"Luca\" Tzekos",
     "url": "https://jobopportunitiesapi.org"
-  },
-  "homepage": "https://github.com/lucagiftzek/dsh-voice#readme",
-  "bugs": {
-    "url": "https://github.com/lucagiftzek/dsh-voice/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/lucagiftzek/dsh-voice.git"
-  },
-  "keywords": [
-    "deepseek-harness",
-    "dictation",
-    "dsh",
-    "dsh-plugin",
-    "speech-to-text",
-    "text-to-speech",
-    "tts"
-  ],
-  "publishConfig": {
-    "access": "public"
   }
 }

@@ -23,6 +23,7 @@ Generated from the adapters by `npm run docs`. See the README for credentials, r
 | `google` Google Cloud Speech (partly verified) | yes | yes | word | EU regions selectable | check the vendor pricing page (Neural2 and Chirp 3 HD differ) | [docs](https://docs.cloud.google.com/text-to-speech/docs/reference/rest) |
 | `amazon` Amazon Polly and Transcribe (partly verified) | yes | yes | word | EU regions selectable | Polly neural about $16 per 1M characters; Transcribe per second | [docs](https://docs.aws.amazon.com/polly/latest/dg/what-is.html) |
 | `openai` OpenAI | yes | yes | estimated | Outside the EU | per character (TTS) and per minute (STT), see the pricing page | [docs](https://developers.openai.com/api/docs/guides/text-to-speech) |
+| `openrouter` OpenRouter | yes | yes | estimated | Depends on the endpoint | set by the vendor of each model (a few models have a free :free variant) | [docs](https://openrouter.ai/docs/guides/overview/multimodal/tts) |
 | `openai-compatible` OpenAI-compatible (partly verified) | per preset | per preset | Kokoro-FastAPI captions, else estimated | Depends on the endpoint | depends on the server (free when self-hosted) | [docs](https://platform.openai.com/docs/api-reference/audio) |
 | `fish` Fish Audio (partly verified) | yes | yes | estimated | Outside the EU | check the vendor pricing page | [docs](https://docs.fish.audio/api-reference/endpoint/openapi-v1/text-to-speech) |
 | `cartesia` Cartesia (partly verified) | yes | yes | word | Outside the EU | check the vendor pricing page | [docs](https://docs.cartesia.ai/api-reference/tts/bytes) |
@@ -36,7 +37,8 @@ Generated from the adapters by `npm run docs`. See the README for credentials, r
 | Provider | TTS | STT | Word timings | Data residency | Price note | Docs |
 |---|---|---|---|---|---|---|
 | `elevenlabs-compatible` Self-hosted (ElevenLabs-compatible) | yes | yes | word (from characters) | Self-hosted | free (your server) | [docs](https://elevenlabs.io/docs/api-reference/text-to-speech/convert) |
-| `tzekos-native` Kokoro (native /api/tts) | yes | no | estimated | Self-hosted | free (your server) | [docs](https://github.com/hexgrad/kokoro) |
+| `tzekos-native` Kokoro (tzekos-tts native) | yes | no | estimated | Self-hosted | free (your server) | [docs](https://github.com/hexgrad/kokoro) |
+| `supertonic` Supertonic 3 (self-hosted, Rust) | yes | no | estimated | Self-hosted | free (your server) | [docs](https://huggingface.co/Supertone/supertonic-3) |
 | `lfm3` Liquid LFM3 Audio (local) | yes | yes | estimated | Self-hosted | free (local) | [docs](https://huggingface.co/LiquidAI) |
 | `piper` Piper (self-hosted) | yes | no | estimated | Self-hosted | free (local) | [docs](https://github.com/OHF-Voice/piper1-gpl/blob/main/docs/API_HTTP.md) |
 | `xtts` Coqui XTTS-v2 (self-hosted) (partly verified) | yes | no | estimated | Self-hosted | free (local, non-commercial licence) | [docs](https://github.com/daswer123/xtts-api-server) |
@@ -122,7 +124,15 @@ OpenAI speech: gpt-4o-mini-tts and tts-1 voices, whisper-1 word timings, gpt-tra
 
 Residency: Default api.openai.com processes in the US. The EU host eu.api.openai.com stores and processes in the EEA and Switzerland, but needs OpenAI sales approval and Modified Abuse Monitoring or Zero Data Retention, and costs 10 percent more. TTS languages: any. STT languages: any. Presets: OpenAI, OpenAI EU (data residency, needs approval). Credential: the API key. The `openai-eu` preset needs an EU data-residency project with approval from OpenAI. The TTS models retire on 2027-01-06 and whisper-1 plus the gpt-4o transcribe family on 2027-02-26.
 
-Verification: Fetched 2026-10-31: developers.openai.com text-to-speech guide (13 voices, tts-1 and tts-1-hd limited to 9, response formats, languages follow Whisper including Greek and Italian), speech-to-text guide (gpt-transcribe recommended, `languages` replaces `language` for it, response carries `languages: [{code}]`, whisper-1 gives word timestamps via verbose_json and timestamp_granularities[], 25 MB limit), deprecations page (tts-1, tts-1-hd, gpt-4o-mini-tts shut down 2027-01-06; whisper-1 and gpt-4o transcribe models 2027-02-26) and the your-data page (EU host eu.api.openai.com, regional storage and processing, MAM or ZDR required, sales eligibility, 10 percent uplift). Unverified: maximum input length of /audio/speech (4096 characters assumed), word timestamps for gpt-transcribe (treated as json only), speed range 0.25 to 4 (from memory of the API reference).
+Verification: Fetched 2026-10-31: developers.openai.com text-to-speech guide (13 voices, tts-1 and tts-1-hd limited to 9, response formats, languages follow Whisper including Greek and Italian), speech-to-text guide (gpt-transcribe recommended, `languages` replaces `language` for it, response carries `languages: [{code}]`, whisper-1 gives word timestamps via verbose_json and timestamp_granularities[], 25 MB limit), deprecations page (tts-1, tts-1-hd, gpt-4o-mini-tts shut down 2027-01-06; whisper-1 and gpt-4o transcribe models 2027-02-26) and the your-data page (EU host eu.api.openai.com, regional storage and processing, MAM or ZDR required, sales eligibility, 10 percent uplift). Unverified: maximum input length of /audio/speech (4096 characters assumed), word timestamps for gpt-transcribe (treated as json only).
+
+#### OpenRouter (`openrouter`)
+
+One key for many vendors' speech models (ElevenLabs, Gemini TTS, Voxtral, Fish, HeyGen, Kokoro) with their voices, plus transcription.
+
+Residency: US router. Each request goes to the vendor of the chosen model, so residency and price follow that vendor: pick EU vendors, or pin an EU endpoint with the instance option "Prefer providers" (for example mistral/eu). TTS languages: any. STT languages: any. Presets: OpenRouter. Credential: the OpenRouter API key. A voice belongs to one model, so pick the model and its voice together (the reader menus list the voices of the chosen model). The vendor of the model sets the residency and the price: option `preferProviders` pins an endpoint such as `mistral/eu`, `onlyProviders` limits the endpoints, `zdr` routes only to endpoints that keep no logs. The speech catalogue is read live, so a model added on OpenRouter appears without a plugin change.
+
+Verification: Checked live on 2026-11-25 against the running service and its TTS guide: GET /api/v1/audio/speech/models (public, one entry per model with output_modalities[].supported_parameters: voice enum, response_format enum mp3 or pcm, speed range, instructions), POST /api/v1/audio/speech (raw audio bytes; Voxtral TTS 3 and ElevenLabs v3 answered audio/mpeg, the free HeyGen Voice answered audio/pcm;rate=44100;channels=1 and was wrapped into a WAV; speed was accepted by Eleven v3, whose catalogue publishes a range, and silently ignored by Voxtral TTS 3, which publishes none), POST /api/v1/audio/transcriptions (multipart file and model; openai/whisper-large-v3-turbo and mistralai/voxtral-mini-transcribe-3-0 answered text, and verbose_json with timestamp_granularities[] gave language, duration and words). Errors: an unknown voice is a 404 "Provider returned 404", an unknown model a 400 "Model ... does not exist", mp3 on a PCM-only model a 400 naming response_format. Unverified: the sample rate of PCM models other than HeyGen (the header is trusted), prices, and every model that was not called.
 
 #### OpenAI-compatible (`openai-compatible`)
 
@@ -182,19 +192,27 @@ Verification: Carried from the 1.x adapter (live in 2026-09); legacy, off unless
 
 #### Self-hosted (ElevenLabs-compatible) (`elevenlabs-compatible`)
 
-Any server speaking the ElevenLabs request shape (preset: Local TTS server, a loopback server with a native /api/tts route).
+Any server speaking the ElevenLabs request shape (preset: Tzekos, a loopback tzekos-tts).
 
-Residency: Self-hosted: data stays wherever the server runs TTS languages: any. STT languages: any. Presets: Local TTS server, Generic ElevenLabs-compatible server. Credential: the server key. The Local TTS server preset points at a loopback server (`http://127.0.0.1:8771`).
+Residency: Self-hosted: data stays wherever the server runs TTS languages: any. STT languages: any. Presets: Tzekos, Generic ElevenLabs-compatible server. Credential: the server key. The Tzekos preset points at a loopback server (`http://127.0.0.1:8771`).
 
-Verification: Verified against a self-hosted reference server (Kokoro and Whisper behind native and ElevenLabs-shaped routes). Other servers with this shape are untested.
+Verification: Verified against the reference tzekos-tts server source (native and ElevenLabs-shaped routes). Other servers with this shape are untested.
 
-#### Kokoro (native /api/tts) (`tzekos-native`)
+#### Kokoro (tzekos-tts native) (`tzekos-native`)
 
-A Kokoro-82M server with a native POST /api/tts call, for example behind a relay (CPU is enough).
+A Kokoro-82M server with the tzekos-tts native POST /api/tts call (CPU only).
 
-Residency: Self-hosted: data stays wherever the server runs TTS languages: en. Presets: Kokoro server. Credential: the server key. Only `POST /api/tts` is ever called.
+Residency: Self-hosted: data stays wherever the server runs TTS languages: en es fr hi it ja pt zh. Presets: Kokoro server. Credential: the server key. Only `POST /api/tts` is ever called.
 
 Verification: Verified against the reference Kokoro server and the relay contract (POST /api/tts only, no probes).
+
+#### Supertonic 3 (self-hosted, Rust) (`supertonic`)
+
+Supertonic 3 on the resident Rust service: 10 voices, 32 languages including Greek, CPU only.
+
+Residency: Self-hosted: data stays wherever the server runs TTS languages: ar bg hr cs da nl en et fi fr de el hi hu id it ja ko lv lt pl pt ro ru sk sl es sv tr uk vi. Presets: Supertonic service. Run the resident service on the speech machine (Supertonic 3 weights, port 8791), then set `SUPERTONIC_TTS_URL` and `SUPERTONIC_API_KEY` in the environment, or add an instance with `baseUrl` in Settings. Voice styles M1-M5 and F1-F5 each work in all 31 languages; `language` is passed per request and an unknown tag becomes `na` so the model decides.
+
+Verification: Verified against the resident server built from the supertonic3-tts crate: POST /api/tts with {text, voice, language} and an xi-api-key, answering WAV at 44.1 kHz.
 
 #### Liquid LFM3 Audio (local) (`lfm3`)
 

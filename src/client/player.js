@@ -55,16 +55,11 @@ export function resume() {
   try { if (synth && synth.paused) synth.resume() } catch (e) { /* no synth */ }
 }
 
-// Browser voices (1 Nov 2026, server-loaded plugins; natural voices added 25 Nov 2026).
-// Chrome also lists online voices ("Google UK English" and friends, localService
-// === false) that send the text to Google: the browser voice and the
-// browser-voice fallback never pick those on their own. The natural neural
-// voices of Edge and Windows ("Microsoft Xiaoxiao Online (Natural)") are cloud
-// voices too, but they are the good ones and the OS offers them by design, so a
-// cloud voice whose name says Natural or Neural is a candidate and is preferred
-// over the mechanical offline set. An explicitly configured voice name
-// (perLanguage.<lang>.tts.voice) is honoured whatever it is. Chrome fills
-// getVoices() asynchronously, so the list is primed at load and on voiceschanged.
+// Browser voices that run on the device only (1 Nov 2026, server-loaded
+// plugins). Chrome also lists online voices ("Google UK English" and friends,
+// localService === false) that send the text to Google; the browser voice and
+// the browser-voice fallback never pick those. Chrome fills getVoices()
+// asynchronously, so the list is primed at load and on voiceschanged.
 let voiceList = []
 function refreshVoices() { try { voiceList = (synth && synth.getVoices()) || [] } catch (e) { voiceList = [] } }
 if (synth) {
@@ -72,22 +67,24 @@ if (synth) {
   try { synth.addEventListener('voiceschanged', refreshVoices) } catch (e) { /* old engine */ }
 }
 
+/**
+ * Pick an on-device voice: same language first (exact tag, then primary
+ * subtag), then the device default, then any local voice. null when the device
+ * has no local voice at all (the caller then stays silent instead of leaking
+ * the text to an online voice).
+ * @param {string} [lang]
+ * @param {SpeechSynthesisVoice[]} [voices] injectable for tests
+ */
+// Browser voices (1 Nov 2026, server-loaded plugins; natural voices added 25 Nov 2026, ported from the published
+// 2.0.1). Chrome also lists online voices ("Google UK English" and friends, localService === false) that send the
+// text to Google: the browser voice never picks those on its own. The natural neural voices of Edge and Windows
+// ("Microsoft Xiaoxiao Online (Natural)") are cloud voices too, but they are the good ones and the OS offers them
+// by design, so a cloud voice whose name says Natural or Neural is a candidate and is preferred over the
+// mechanical offline set.
 const NATURAL = /\b(natural|neural)\b/i
 const isLocal = (v) => v.localService === true
 const isNatural = (v) => v.localService !== true && NATURAL.test(String(v.name || ''))
 
-/**
- * Pick a browser voice. Same language first (exact tag, then primary subtag),
- * and within a language a natural voice before an on-device one; then the
- * device default, then any on-device voice. A named voice (`preferred`, from
- * perLanguage.<lang>.tts.voice) wins when the device has it (exact name, then a
- * part of the name, case-insensitive) and is otherwise ignored. null when
- * nothing is usable (the caller then stays silent instead of leaking the text
- * to an ordinary online voice).
- * @param {string} [lang]
- * @param {SpeechSynthesisVoice[]} [voices] injectable for tests
- * @param {string} [preferred] a voice name
- */
 export function localVoice(lang, voices, preferred) {
   if (!voices) { if (!voiceList.length) refreshVoices(); voices = voiceList }
   const all = (voices || []).filter((v) => v)
@@ -109,14 +106,14 @@ export function localVoice(lang, voices, preferred) {
     local.find((v) => v.default) || local[0] || null
 }
 
-/** Does this device have any usable speech voice (on-device, or a natural one)? */
+
+/** Does this device have any on-device speech voice? */
 export function hasLocalVoice() { return localVoice('') !== null }
 
 /**
  * Sentence-sized utterances: several engines drop a long one, and stop feels
  * immediate. hooks.onBoundary(charIndex) gets offsets into `text`.
- * hooks.voice names a preferred voice (perLanguage.<lang>.tts.voice).
- * Returns false when no usable voice exists.
+ * Only on-device voices are used; returns false when there is none.
  */
 export function speakBrowser(text, lang, onEnd, hooks) {
   if (!synth) return false
@@ -156,9 +153,7 @@ export function speakBrowserSegments(segments, onEnd, hooks) {
     if (playToken !== my) return
     if (k >= segments.length) { if (onEnd) onEnd(); return }
     const s = segments[k]; k += 1
-    const h = Object.assign({}, hooks && hooks.forSegment ? hooks.forSegment(s) : null)
-    if (hooks && hooks.voiceFor) h.voice = hooks.voiceFor(s)
-    if (!speakBrowser(s.text, s.lang, next, h)) next()
+    if (!speakBrowser(s.text, s.lang, next, hooks && hooks.forSegment ? hooks.forSegment(s) : null)) next()
   }
   synth.cancel()
   next()
@@ -277,7 +272,7 @@ export function planJobs(segments, engineFor) {
   segments.forEach((seg, si) => {
     const e = engineFor(seg)
     const base = { lang: seg.lang, langSource: seg.source, seg: si }
-    if (e.engine === 'browser') { jobs.push(Object.assign({ text: seg.text, engine: 'browser', voice: e.voice || '', pauseBeforeMs: seg.pauseBeforeMs || 0 }, base)); return }
+    if (e.engine === 'browser') { jobs.push(Object.assign({ text: seg.text, engine: 'browser', pauseBeforeMs: seg.pauseBeforeMs || 0 }, base)); return }
     speechChunks(seg.text, e.plan).forEach((c, k) => {
       jobs.push(Object.assign({ text: c, engine: e.engine, model: e.model, voice: e.voice, alignment: Boolean(e.alignment), pauseBeforeMs: k === 0 ? seg.pauseBeforeMs || 0 : 0 }, base))
     })
@@ -321,7 +316,7 @@ export async function playJobs(jobs, opts) {
       if (i === 0) safe(o.onFirstAudio)
       safe(o.onChunk, job, null)
       played = await new Promise((resolve) => {
-        if (!speakBrowser(job.text, job.lang, () => resolve(true), { voice: job.voice, onBoundary: (ci) => safe(o.onBoundary, job, ci) })) resolve(false)
+        if (!speakBrowser(job.text, job.lang, () => resolve(true), { onBoundary: (ci) => safe(o.onBoundary, job, ci) })) resolve(false)
       })
     } else {
       current = a
